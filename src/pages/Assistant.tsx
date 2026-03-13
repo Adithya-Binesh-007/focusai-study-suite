@@ -46,7 +46,7 @@ export default function Assistant() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return;
 
-    const recognition = new SpeechRecognition();
+    const recognition = new SR();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.onresult = (event) => {
