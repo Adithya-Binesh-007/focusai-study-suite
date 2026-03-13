@@ -63,11 +63,11 @@ export function useCredits() {
         })
         .eq("user_id", user.id);
 
-      await supabase.from("daily_upgrades").insert({
+      await supabase.from("daily_upgrades").insert([{
         user_id: user.id,
-        upgrade_type: upgradeType as string,
+        upgrade_type: upgradeType,
         used_date: today,
-      });
+      }]);
 
       await supabase.from("credit_transactions").insert({
         user_id: user.id,

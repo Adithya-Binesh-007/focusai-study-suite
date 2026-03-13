@@ -25,11 +25,11 @@ type Difficulty = "easy" | "medium" | "difficult";
 
 function generateDailyTasks(userId: string) {
   const shuffled = [...STUDY_TASKS].sort(() => Math.random() - 0.5).slice(0, 10);
-  const difficulties: Difficulty[] = [
+  const difficulties = ([
     "easy", "easy", "easy", "easy",
     "medium", "medium", "medium", "medium",
     "difficult", "difficult",
-  ].sort(() => Math.random() - 0.5);
+  ] as Difficulty[]).sort(() => Math.random() - 0.5);
 
   const rewards: Record<Difficulty, number> = { easy: 5, medium: 10, difficult: 15 };
 
