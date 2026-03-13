@@ -14,16 +14,195 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      credit_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          type: Database["public"]["Enums"]["credit_transaction_type"]
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type: Database["public"]["Enums"]["credit_transaction_type"]
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type?: Database["public"]["Enums"]["credit_transaction_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      daily_upgrades: {
+        Row: {
+          created_at: string
+          id: string
+          upgrade_type: Database["public"]["Enums"]["upgrade_type"]
+          used_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          upgrade_type: Database["public"]["Enums"]["upgrade_type"]
+          used_date?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          upgrade_type?: Database["public"]["Enums"]["upgrade_type"]
+          used_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          daily_uploads_base: number
+          daily_uploads_remaining: number
+          display_name: string | null
+          id: string
+          last_active_date: string | null
+          streak_count: number
+          total_credits: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_uploads_base?: number
+          daily_uploads_remaining?: number
+          display_name?: string | null
+          id?: string
+          last_active_date?: string | null
+          streak_count?: number
+          total_credits?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_uploads_base?: number
+          daily_uploads_remaining?: number
+          display_name?: string | null
+          id?: string
+          last_active_date?: string | null
+          streak_count?: number
+          total_credits?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          created_at: string
+          credits_reward: number
+          description: string | null
+          difficulty: Database["public"]["Enums"]["task_difficulty"]
+          generated_date: string
+          id: string
+          is_completed: boolean
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_reward: number
+          description?: string | null
+          difficulty: Database["public"]["Enums"]["task_difficulty"]
+          generated_date?: string
+          id?: string
+          is_completed?: boolean
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_reward?: number
+          description?: string | null
+          difficulty?: Database["public"]["Enums"]["task_difficulty"]
+          generated_date?: string
+          id?: string
+          is_completed?: boolean
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
+      credit_transaction_type: "earned" | "spent"
+      task_difficulty: "easy" | "medium" | "difficult"
+      upgrade_type: "plus_5" | "plus_10"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +329,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+      credit_transaction_type: ["earned", "spent"],
+      task_difficulty: ["easy", "medium", "difficult"],
+      upgrade_type: ["plus_5", "plus_10"],
+    },
   },
 } as const
