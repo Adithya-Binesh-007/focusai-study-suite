@@ -43,8 +43,8 @@ export default function Assistant() {
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition: typeof window.SpeechRecognition }).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
 
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
