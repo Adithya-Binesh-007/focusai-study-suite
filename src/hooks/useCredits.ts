@@ -36,7 +36,7 @@ export function useCredits() {
         .from("daily_upgrades")
         .select("id")
         .eq("user_id", user.id)
-        .eq("upgrade_type", upgradeType as string)
+        .eq("upgrade_type", upgradeType)
         .eq("used_date", today);
 
       if (existing && existing.length > 0) {
