@@ -8,6 +8,7 @@ export interface ChatMessage {
   id?: string;
   role: "user" | "assistant";
   content: string;
+  imageUrl?: string;
 }
 
 export function useChat() {
@@ -17,11 +18,11 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId] = useState(() => crypto.randomUUID());
 
-  const sendMessage = useCallback(
-    async (input: string, examMode = false) => {
-      if (!user || !input.trim()) return;
+  const uploadImage = useCallback(
+    async (file: File): Promise<string | null> => {
+      if (!user) return null;
 
-      // Check daily uploads
+      // Check daily uploads for photo uploads only
       const { data: profile } = await supabase
         .from("profiles")
         .select("daily_uploads_remaining")
@@ -30,14 +31,41 @@ export function useChat() {
 
       if (!profile || profile.daily_uploads_remaining <= 0) {
         toast({
-          title: "Daily Limit Reached",
-          description: "Use credits to upgrade your daily AI uploads",
+          title: "Daily Upload Limit Reached",
+          description: "Use credits to upgrade your daily photo uploads",
           variant: "destructive",
         });
-        return;
+        return null;
       }
 
-      const userMsg: ChatMessage = { role: "user", content: input };
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from("chat-uploads").upload(path, file);
+      if (error) {
+        toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+        return null;
+      }
+
+      // Decrement daily uploads (only for photo uploads)
+      await supabase
+        .from("profiles")
+        .update({ daily_uploads_remaining: (profile.daily_uploads_remaining ?? 1) - 1 })
+        .eq("user_id", user.id);
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+
+      const { data: urlData } = supabase.storage.from("chat-uploads").getPublicUrl(path);
+      return urlData.publicUrl;
+    },
+    [user, queryClient]
+  );
+
+  const sendMessage = useCallback(
+    async (input: string, examMode = false, imageUrl?: string) => {
+      if (!user || (!input.trim() && !imageUrl)) return;
+
+      // Questions are unlimited — no daily limit check for text-only messages
+
+      const userMsg: ChatMessage = { role: "user", content: input, imageUrl };
       setMessages((prev) => [...prev, userMsg]);
       setIsLoading(true);
 
@@ -46,15 +74,8 @@ export function useChat() {
         user_id: user.id,
         conversation_id: conversationId,
         role: "user",
-        content: input,
+        content: imageUrl ? `[Image: ${imageUrl}]\n${input}` : input,
       });
-
-      // Decrement daily uploads
-      await supabase
-        .from("profiles")
-        .update({ daily_uploads_remaining: (profile.daily_uploads_remaining ?? 1) - 1 })
-        .eq("user_id", user.id);
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
 
       let assistantSoFar = "";
       const upsertAssistant = (chunk: string) => {
@@ -71,7 +92,7 @@ export function useChat() {
       try {
         const allMessages = [...messages, userMsg].map((m) => ({
           role: m.role,
-          content: m.content,
+          content: m.imageUrl ? `[Image: ${m.imageUrl}]\n${m.content}` : m.content,
         }));
 
         const resp = await fetch(
@@ -151,5 +172,5 @@ export function useChat() {
 
   const clearChat = () => setMessages([]);
 
-  return { messages, isLoading, sendMessage, clearChat };
+  return { messages, isLoading, sendMessage, clearChat, uploadImage };
 }

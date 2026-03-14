@@ -28,7 +28,7 @@ export default function Credits() {
           </div>
           <div className="mt-4 flex items-center gap-2 text-sm opacity-80">
             <Upload className="h-4 w-4" />
-            {profile?.daily_uploads_remaining ?? 0} AI uploads remaining today
+            {profile?.daily_uploads_remaining ?? 0} photo uploads remaining today
           </div>
         </CardContent>
       </Card>
@@ -37,7 +37,7 @@ export default function Credits() {
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">+5 AI Uploads</CardTitle>
+            <CardTitle className="text-lg">+5 Photo Uploads</CardTitle>
             <CardDescription>Costs 50 credits • Once per day</CardDescription>
           </CardHeader>
           <CardContent>
@@ -52,7 +52,7 @@ export default function Credits() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">+10 AI Uploads</CardTitle>
+            <CardTitle className="text-lg">+10 Photo Uploads</CardTitle>
             <CardDescription>Costs 100 credits • Once per day</CardDescription>
           </CardHeader>
           <CardContent>

@@ -3,28 +3,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 
-const STUDY_TASKS = [
-  { title: "Study for 30 minutes", description: "Focus on your weakest subject for 30 uninterrupted minutes" },
+// On-site tasks (trackable within the app) — majority
+const ONSITE_TASKS = [
+  { title: "Ask AI 3 questions", description: "Use the AI Study Assistant to ask 3 study questions" },
+  { title: "Use Exam Mode", description: "Switch to Exam Mode and practice with AI-generated questions" },
+  { title: "Download AI notes as PDF", description: "Generate study notes with AI and download them as PDF" },
+  { title: "Start a new AI conversation", description: "Begin a fresh conversation with the AI assistant" },
+  { title: "Upload a photo to AI", description: "Upload a study photo and ask the AI to analyze it" },
+  { title: "Complete 5 other tasks", description: "Complete at least 5 other daily tasks today" },
+  { title: "Visit the Analytics page", description: "Check your study analytics and progress" },
+  { title: "Check your credit balance", description: "Visit the Credits page and review your balance" },
+];
+
+// Off-site tasks (manual/honor system) — fewer
+const OFFSITE_TASKS = [
+  { title: "Study for 30 minutes", description: "Focus on your weakest subject for 30 minutes" },
+  { title: "Read 10 pages", description: "Read 10 pages from your textbook" },
+  { title: "Solve 5 math problems", description: "Practice with 5 problems on paper" },
   { title: "Revise yesterday's notes", description: "Go through notes from your last study session" },
-  { title: "Solve 5 math problems", description: "Practice with 5 problems from your current topic" },
-  { title: "Read 10 pages", description: "Read 10 pages from your textbook or study material" },
-  { title: "Practice previous exam questions", description: "Attempt at least 3 past exam questions" },
-  { title: "Create flashcards", description: "Make 10 flashcards for key concepts" },
-  { title: "Summarize a chapter", description: "Write a one-page summary of a chapter you studied" },
-  { title: "Teach a concept", description: "Explain a concept you learned to someone or write it out" },
-  { title: "Watch an educational video", description: "Watch a lecture or tutorial video on your topic" },
-  { title: "Organize study materials", description: "Sort and organize your notes and files" },
-  { title: "Complete a practice quiz", description: "Take an online quiz on your current subject" },
-  { title: "Write key formulas", description: "List all important formulas for your current subject" },
-  { title: "Review mistakes", description: "Go through past errors and understand corrections" },
-  { title: "Mind map a topic", description: "Create a mind map for a complex topic" },
-  { title: "Study group session", description: "Discuss topics with classmates for 20 minutes" },
 ];
 
 type Difficulty = "easy" | "medium" | "difficult";
 
 function generateDailyTasks(userId: string) {
-  const shuffled = [...STUDY_TASKS].sort(() => Math.random() - 0.5).slice(0, 10);
+  // Pick 7 on-site + 3 off-site = 10 tasks
+  const shuffledOnsite = [...ONSITE_TASKS].sort(() => Math.random() - 0.5).slice(0, 7);
+  const shuffledOffsite = [...OFFSITE_TASKS].sort(() => Math.random() - 0.5).slice(0, 3);
+  const allTasks = [...shuffledOnsite, ...shuffledOffsite].sort(() => Math.random() - 0.5);
+
   const difficulties = ([
     "easy", "easy", "easy", "easy",
     "medium", "medium", "medium", "medium",
@@ -33,7 +39,7 @@ function generateDailyTasks(userId: string) {
 
   const rewards: Record<Difficulty, number> = { easy: 5, medium: 10, difficult: 15 };
 
-  return shuffled.map((task, i) => ({
+  return allTasks.map((task, i) => ({
     user_id: userId,
     title: task.title,
     description: task.description,
@@ -87,24 +93,17 @@ export function useTasks() {
         .eq("id", taskId);
       if (taskError) throw taskError;
 
-      const { error: profileError } = await supabase.rpc("increment_credits" as never, {
-        _user_id: user.id,
-        _amount: task.credits_reward,
-      } as never);
-
-      // Fallback: update credits directly if RPC doesn't exist
-      if (profileError) {
-        const { data: profile } = await supabase
+      // Update credits directly
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("total_credits")
+        .eq("user_id", user.id)
+        .single();
+      if (profile) {
+        await supabase
           .from("profiles")
-          .select("total_credits")
-          .eq("user_id", user.id)
-          .single();
-        if (profile) {
-          await supabase
-            .from("profiles")
-            .update({ total_credits: profile.total_credits + task.credits_reward })
-            .eq("user_id", user.id);
-        }
+          .update({ total_credits: profile.total_credits + task.credits_reward })
+          .eq("user_id", user.id);
       }
 
       await supabase.from("credit_transactions").insert({

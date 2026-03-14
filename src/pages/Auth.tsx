@@ -10,17 +10,21 @@ import { Brain, ArrowLeft } from "lucide-react";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // We use a fake email derived from username for Supabase Auth
+  const toEmail = (u: string) => `${u.toLowerCase().trim()}@focusai.local`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      const email = toEmail(username);
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -30,12 +34,12 @@ export default function Auth() {
           email,
           password,
           options: {
-            data: { display_name: displayName },
-            emailRedirectTo: window.location.origin,
+            data: { display_name: displayName || username },
           },
         });
         if (error) throw error;
-        toast({ title: "Account created!", description: "Check your email to confirm your account." });
+        toast({ title: "Account created!", description: "You can now sign in." });
+        navigate("/dashboard");
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "An error occurred";
@@ -67,15 +71,16 @@ export default function Auth() {
                   placeholder="Display name"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  required
                 />
               )}
               <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
+                minLength={3}
+                pattern="[a-zA-Z0-9_]+"
+                title="Letters, numbers, and underscores only"
               />
               <Input
                 type="password"
