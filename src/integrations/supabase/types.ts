@@ -131,6 +131,47 @@ export type Database = {
         }
         Relationships: []
       }
+      task_progress: {
+        Row: {
+          created_at: string
+          current_count: number
+          id: string
+          progress_type: string
+          target_count: number
+          task_id: string
+          tracked_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_count?: number
+          id?: string
+          progress_type: string
+          target_count?: number
+          task_id: string
+          tracked_date?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_count?: number
+          id?: string
+          progress_type?: string
+          target_count?: number
+          task_id?: string
+          tracked_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_progress_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           created_at: string

@@ -1,10 +1,10 @@
 import { useTasks } from "@/hooks/useTasks";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { CheckCircle, Clock, Coins, Star } from "lucide-react";
+import { CheckCircle, Clock, Coins, Star, Lock } from "lucide-react";
 
 const difficultyColors = {
   easy: "bg-success/10 text-success border-success/20",
@@ -13,7 +13,7 @@ const difficultyColors = {
 };
 
 export default function Tasks() {
-  const { tasks, isLoading, completeTask, completedCount, totalCreditsToday } = useTasks();
+  const { tasks, isLoading, completeTask, completedCount, totalCreditsToday, getTaskProgress, isTrackableTask, canComplete } = useTasks();
 
   if (isLoading) {
     return <div className="p-6 flex items-center justify-center"><Clock className="h-6 w-6 animate-spin" /></div>;
@@ -23,7 +23,7 @@ export default function Tasks() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Daily Tasks</h1>
-        <p className="text-muted-foreground mt-1">Complete tasks to earn credits. Tasks reset daily.</p>
+        <p className="text-muted-foreground mt-1">Complete tasks to earn credits. On-site tasks track your progress automatically.</p>
       </div>
 
       {/* Progress Overview */}
@@ -49,55 +49,90 @@ export default function Tasks() {
 
       {/* Task List */}
       <div className="space-y-3">
-        {tasks.map((task, i) => (
-          <motion.div
-            key={task.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.03 }}
-          >
-            <Card className={task.is_completed ? "opacity-60" : ""}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      task.is_completed ? "bg-success/10" : "bg-muted"
-                    }`}>
-                      {task.is_completed ? (
-                        <CheckCircle className="h-4 w-4 text-success" />
-                      ) : (
-                        <Star className="h-4 w-4 text-muted-foreground" />
+        {tasks.map((task, i) => {
+          const progress = getTaskProgress(task.id);
+          const trackable = isTrackableTask(task.title);
+          const completable = canComplete(task);
+          const progressPercent = progress
+            ? Math.min((progress.current_count / progress.target_count) * 100, 100)
+            : 0;
+
+          return (
+            <motion.div
+              key={task.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.03 }}
+            >
+              <Card className={task.is_completed ? "opacity-60" : ""}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                        task.is_completed ? "bg-success/10" : "bg-muted"
+                      }`}>
+                        {task.is_completed ? (
+                          <CheckCircle className="h-4 w-4 text-success" />
+                        ) : (
+                          <Star className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium ${task.is_completed ? "line-through" : ""}`}>{task.title}</p>
+                          {trackable && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-primary/5 text-primary border-primary/20">
+                              Auto-tracked
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{task.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <Badge variant="outline" className={difficultyColors[task.difficulty as keyof typeof difficultyColors]}>
+                        {task.difficulty}
+                      </Badge>
+                      <div className="flex items-center gap-1 text-sm font-medium">
+                        <Coins className="h-3 w-3 text-warning" />
+                        +{task.credits_reward}
+                      </div>
+                      {!task.is_completed && (
+                        <Button
+                          size="sm"
+                          className={completable ? "gradient-primary" : ""}
+                          variant={completable ? "default" : "outline"}
+                          onClick={() => completeTask.mutate(task.id)}
+                          disabled={completeTask.isPending || !completable}
+                        >
+                          {trackable && !completable ? (
+                            <><Lock className="h-3 w-3 mr-1" /> Locked</>
+                          ) : (
+                            "Claim"
+                          )}
+                        </Button>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <p className={`font-medium ${task.is_completed ? "line-through" : ""}`}>{task.title}</p>
-                      <p className="text-sm text-muted-foreground">{task.description}</p>
-                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={difficultyColors[task.difficulty as keyof typeof difficultyColors]}>
-                      {task.difficulty}
-                    </Badge>
-                    <div className="flex items-center gap-1 text-sm font-medium">
-                      <Coins className="h-3 w-3 text-warning" />
-                      +{task.credits_reward}
+
+                  {/* Progress bar for trackable tasks */}
+                  {trackable && !task.is_completed && progress && (
+                    <div className="ml-11 mt-1">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                        <span>Progress</span>
+                        <span>{progress.current_count}/{progress.target_count}</span>
+                      </div>
+                      <Progress
+                        value={progressPercent}
+                        className="h-2"
+                      />
                     </div>
-                    {!task.is_completed && (
-                      <Button
-                        size="sm"
-                        className="gradient-primary"
-                        onClick={() => completeTask.mutate(task.id)}
-                        disabled={completeTask.isPending}
-                      >
-                        Complete
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );

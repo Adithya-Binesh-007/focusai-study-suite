@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useProfile } from "@/hooks/useProfile";
 import { useCredits } from "@/hooks/useCredits";
+import { useTaskProgress } from "@/hooks/useTaskProgress";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -8,6 +10,11 @@ import { Coins, Upload, ArrowUp, ArrowDown, Clock } from "lucide-react";
 export default function Credits() {
   const { profile } = useProfile();
   const { transactions, upgrade } = useCredits();
+  const { incrementProgress } = useTaskProgress();
+
+  useEffect(() => {
+    incrementProgress("visit_credits");
+  }, []);
 
   return (
     <div className="p-6 space-y-6">

@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
+import { useTaskProgress } from "@/hooks/useTaskProgress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { Flame, Target, Brain, TrendingUp } from "lucide-react";
@@ -10,6 +12,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export default function Analytics() {
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { incrementProgress } = useTaskProgress();
+
+  useEffect(() => {
+    incrementProgress("visit_analytics");
+  }, []);
 
   const { data: weeklyTasks = [] } = useQuery({
     queryKey: ["weekly-tasks", user?.id],

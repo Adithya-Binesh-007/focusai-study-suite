@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
+import { TRACKABLE_TASKS } from "@/hooks/useTaskProgress";
 
 // On-site tasks (trackable within the app) — majority
 const ONSITE_TASKS = [
@@ -25,8 +26,15 @@ const OFFSITE_TASKS = [
 
 type Difficulty = "easy" | "medium" | "difficult";
 
+interface TaskProgress {
+  id: string;
+  task_id: string;
+  current_count: number;
+  target_count: number;
+  progress_type: string;
+}
+
 function generateDailyTasks(userId: string) {
-  // Pick 7 on-site + 3 off-site = 10 tasks
   const shuffledOnsite = [...ONSITE_TASKS].sort(() => Math.random() - 0.5).slice(0, 7);
   const shuffledOffsite = [...OFFSITE_TASKS].sort(() => Math.random() - 0.5).slice(0, 3);
   const allTasks = [...shuffledOnsite, ...shuffledOffsite].sort(() => Math.random() - 0.5);
@@ -74,6 +82,24 @@ export function useTasks() {
           .insert(newTasks)
           .select();
         if (insertError) throw insertError;
+
+        // Create task_progress rows for trackable on-site tasks
+        if (inserted) {
+          const progressRows = inserted
+            .filter((t) => TRACKABLE_TASKS[t.title])
+            .map((t) => ({
+              user_id: user.id,
+              task_id: t.id,
+              current_count: 0,
+              target_count: TRACKABLE_TASKS[t.title].target,
+              progress_type: TRACKABLE_TASKS[t.title].type,
+              tracked_date: today,
+            }));
+          if (progressRows.length > 0) {
+            await supabase.from("task_progress").insert(progressRows);
+          }
+        }
+
         return inserted || [];
       }
       return data;
@@ -81,11 +107,49 @@ export function useTasks() {
     enabled: !!user,
   });
 
+  // Fetch progress for all tasks today
+  const { data: taskProgress = [] } = useQuery<TaskProgress[]>({
+    queryKey: ["task-progress", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("task_progress")
+        .select("id, task_id, current_count, target_count, progress_type")
+        .eq("user_id", user.id)
+        .eq("tracked_date", today);
+      if (error) throw error;
+      return (data || []) as TaskProgress[];
+    },
+    enabled: !!user,
+  });
+
+  const getTaskProgress = (taskId: string): TaskProgress | undefined => {
+    return taskProgress.find((p) => p.task_id === taskId);
+  };
+
+  const isTrackableTask = (title: string): boolean => {
+    return !!TRACKABLE_TASKS[title];
+  };
+
+  const canComplete = (task: { id: string; title: string; is_completed: boolean }): boolean => {
+    if (task.is_completed) return false;
+    const trackable = TRACKABLE_TASKS[task.title];
+    if (!trackable) return true; // off-site tasks can always be manually completed
+    const progress = getTaskProgress(task.id);
+    if (!progress) return false;
+    return progress.current_count >= progress.target_count;
+  };
+
   const completeTask = useMutation({
     mutationFn: async (taskId: string) => {
       if (!user) throw new Error("Not authenticated");
       const task = tasks.find((t) => t.id === taskId);
       if (!task || task.is_completed) throw new Error("Task already completed");
+
+      if (!canComplete(task)) {
+        throw new Error("Task progress not yet complete");
+      }
 
       const { error: taskError } = await supabase
         .from("tasks")
@@ -93,7 +157,6 @@ export function useTasks() {
         .eq("id", taskId);
       if (taskError) throw taskError;
 
-      // Update credits directly
       const { data: profile } = await supabase
         .from("profiles")
         .select("total_credits")
@@ -117,6 +180,7 @@ export function useTasks() {
     },
     onSuccess: (task) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task-progress"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["credit-transactions"] });
       toast({
@@ -124,10 +188,26 @@ export function useTasks() {
         description: `You earned ${task.credits_reward} credits!`,
       });
     },
+    onError: (error) => {
+      toast({
+        title: "Cannot Complete",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const completedCount = tasks.filter((t) => t.is_completed).length;
   const totalCreditsToday = tasks.filter((t) => t.is_completed).reduce((sum, t) => sum + t.credits_reward, 0);
 
-  return { tasks, isLoading, completeTask, completedCount, totalCreditsToday };
+  return {
+    tasks,
+    isLoading,
+    completeTask,
+    completedCount,
+    totalCreditsToday,
+    getTaskProgress,
+    isTrackableTask,
+    canComplete,
+  };
 }

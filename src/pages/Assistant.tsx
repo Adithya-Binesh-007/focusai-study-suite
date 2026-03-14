@@ -1,23 +1,28 @@
 import { useState, useRef, useEffect } from "react";
 import { useChat, ChatMessage } from "@/hooks/useChat";
 import { useProfile } from "@/hooks/useProfile";
+import { useTaskProgress } from "@/hooks/useTaskProgress";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Send, Trash2, Download, Brain, GraduationCap, Loader2, ImagePlus, Upload } from "lucide-react";
+import { Mic, MicOff, Send, Trash2, Download, Brain, GraduationCap, Loader2, ImagePlus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import jsPDF from "jspdf";
 
 export default function Assistant() {
   const { messages, isLoading, sendMessage, clearChat, uploadImage } = useChat();
   const { profile } = useProfile();
+  const { incrementProgress } = useTaskProgress();
   const [input, setInput] = useState("");
   const [examMode, setExamMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [pendingImage, setPendingImage] = useState<{ file: File; preview: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [examModeTracked, setExamModeTracked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -25,6 +30,14 @@ export default function Assistant() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Track exam mode usage
+  useEffect(() => {
+    if (examMode && !examModeTracked) {
+      incrementProgress("exam_mode_use");
+      setExamModeTracked(true);
+    }
+  }, [examMode, examModeTracked, incrementProgress]);
 
   const handleSend = async () => {
     if ((!input.trim() && !pendingImage) || isLoading) return;
@@ -34,13 +47,18 @@ export default function Assistant() {
       setIsUploading(true);
       const url = await uploadImage(pendingImage.file);
       setIsUploading(false);
-      if (!url) return; // upload failed or limit reached
+      if (!url) return;
       imageUrl = url;
       setPendingImage(null);
+      // Track photo upload
+      incrementProgress("photo_upload");
     }
 
     sendMessage(input, examMode, imageUrl);
     setInput("");
+
+    // Track AI question asked
+    incrementProgress("ai_questions");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -53,12 +71,16 @@ export default function Assistant() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      return;
-    }
+    if (!file.type.startsWith("image/")) return;
     const preview = URL.createObjectURL(file);
     setPendingImage({ file, preview });
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleClearChat = () => {
+    clearChat();
+    // Track new conversation
+    incrementProgress("new_conversation");
   };
 
   const toggleRecording = () => {
@@ -67,10 +89,8 @@ export default function Assistant() {
       setIsRecording(false);
       return;
     }
-
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return;
-
     const recognition = new SR();
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -90,6 +110,8 @@ export default function Assistant() {
     const lines = doc.splitTextToSize(content, 180);
     doc.text(lines, 15, 20);
     doc.save("focusai-notes.pdf");
+    // Track PDF download
+    incrementProgress("pdf_download");
   };
 
   return (
@@ -103,7 +125,7 @@ export default function Assistant() {
           <div>
             <h1 className="font-semibold">AI Study Assistant</h1>
             <p className="text-xs text-muted-foreground">
-              {profile?.daily_uploads_remaining ?? 0} photo uploads remaining today • Unlimited questions
+              {profile?.daily_uploads_remaining ?? 0} photo uploads remaining • Unlimited questions
             </p>
           </div>
         </div>
@@ -113,7 +135,7 @@ export default function Assistant() {
             <span className="text-sm text-muted-foreground">Exam Mode</span>
             <Switch checked={examMode} onCheckedChange={setExamMode} />
           </div>
-          <Button variant="ghost" size="icon" onClick={clearChat}>
+          <Button variant="ghost" size="icon" onClick={handleClearChat}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -130,7 +152,7 @@ export default function Assistant() {
             <p className="text-muted-foreground text-sm max-w-md">
               {examMode
                 ? "Exam Mode is ON — I'll focus on quick revision, formulas, and practice questions."
-                : "Ask me anything! I can generate notes, explain concepts, solve problems, and more. Upload photos of your notes or questions too!"}
+                : "Ask me anything! I can generate notes, explain concepts, solve problems, and more. Upload photos of your notes too!"}
             </p>
             <div className="flex flex-wrap gap-2 mt-6 max-w-lg justify-center">
               {["Explain quantum physics", "Generate study notes for biology", "Create practice questions for math", "Summarize Chapter 5"].map((q) => (
@@ -164,7 +186,9 @@ export default function Assistant() {
                 )}
                 {msg.role === "assistant" ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                      {msg.content}
+                    </ReactMarkdown>
                     <div className="mt-2 flex justify-end">
                       <Button
                         variant="ghost"
