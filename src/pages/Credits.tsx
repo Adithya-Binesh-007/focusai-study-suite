@@ -52,7 +52,7 @@ export default function Credits() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">+10 AI Uploads</CardTitle>
+            <CardTitle className="text-lg">+10 Photo Uploads</CardTitle>
             <CardDescription>Costs 100 credits • Once per day</CardDescription>
           </CardHeader>
           <CardContent>
