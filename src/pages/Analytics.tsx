@@ -12,6 +12,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export default function Analytics() {
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { incrementProgress } = useTaskProgress();
+
+  useEffect(() => {
+    incrementProgress("visit_analytics");
+  }, []);
 
   const { data: weeklyTasks = [] } = useQuery({
     queryKey: ["weekly-tasks", user?.id],

@@ -10,6 +10,11 @@ import { Coins, Upload, ArrowUp, ArrowDown, Clock } from "lucide-react";
 export default function Credits() {
   const { profile } = useProfile();
   const { transactions, upgrade } = useCredits();
+  const { incrementProgress } = useTaskProgress();
+
+  useEffect(() => {
+    incrementProgress("visit_credits");
+  }, []);
 
   return (
     <div className="p-6 space-y-6">
