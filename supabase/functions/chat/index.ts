@@ -16,7 +16,13 @@ You can:
 - Generate exam preparation guides
 - Create practice questions
 
-Format your responses using markdown with headers, bullet points, and code blocks where appropriate. Be thorough but concise.`;
+Format your responses using markdown with headers, bullet points, and code blocks where appropriate. Be thorough but concise.
+
+IMPORTANT for math: When writing mathematical expressions, use LaTeX notation:
+- For inline math, wrap with single dollar signs: $x^2 + y^2 = z^2$
+- For display/block math, wrap with double dollar signs: $$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$
+- Always use LaTeX for fractions (\\frac{a}{b}), exponents (x^{n}), subscripts (a_{n}), integrals, summations, etc.
+- Never use plain text for mathematical expressions. Always format them properly with LaTeX.`;
 
 const EXAM_SYSTEM_PROMPT = `You are FocusAI in Exam Mode. Focus ONLY on:
 - Quick revision notes with key points
@@ -25,7 +31,13 @@ const EXAM_SYSTEM_PROMPT = `You are FocusAI in Exam Mode. Focus ONLY on:
 - Memory aids and mnemonics
 - Key concepts that are commonly tested
 
-Be extremely concise and exam-focused. Use bullet points, bold key terms, and organize by importance. Format with markdown.`;
+Be extremely concise and exam-focused. Use bullet points, bold key terms, and organize by importance. Format with markdown.
+
+IMPORTANT for math: When writing mathematical expressions, use LaTeX notation:
+- For inline math, wrap with single dollar signs: $x^2 + y^2 = z^2$
+- For display/block math, wrap with double dollar signs: $$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$
+- Always use LaTeX for fractions, exponents, integrals, summations, etc.
+- Never use plain text for mathematical expressions.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
