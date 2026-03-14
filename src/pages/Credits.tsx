@@ -37,7 +37,7 @@ export default function Credits() {
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">+5 AI Uploads</CardTitle>
+            <CardTitle className="text-lg">+5 Photo Uploads</CardTitle>
             <CardDescription>Costs 50 credits • Once per day</CardDescription>
           </CardHeader>
           <CardContent>
