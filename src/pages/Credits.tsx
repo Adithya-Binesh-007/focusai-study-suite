@@ -28,7 +28,7 @@ export default function Credits() {
           </div>
           <div className="mt-4 flex items-center gap-2 text-sm opacity-80">
             <Upload className="h-4 w-4" />
-            {profile?.daily_uploads_remaining ?? 0} AI uploads remaining today
+            {profile?.daily_uploads_remaining ?? 0} photo uploads remaining today
           </div>
         </CardContent>
       </Card>
