@@ -6,26 +6,40 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Send, Trash2, Download, Brain, GraduationCap, Loader2 } from "lucide-react";
+import { Mic, MicOff, Send, Trash2, Download, Brain, GraduationCap, Loader2, ImagePlus, Upload } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import jsPDF from "jspdf";
 
 export default function Assistant() {
-  const { messages, isLoading, sendMessage, clearChat } = useChat();
+  const { messages, isLoading, sendMessage, clearChat, uploadImage } = useChat();
   const { profile } = useProfile();
   const [input, setInput] = useState("");
   const [examMode, setExamMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [pendingImage, setPendingImage] = useState<{ file: File; preview: string } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim() || isLoading) return;
-    sendMessage(input, examMode);
+  const handleSend = async () => {
+    if ((!input.trim() && !pendingImage) || isLoading) return;
+
+    let imageUrl: string | undefined;
+    if (pendingImage) {
+      setIsUploading(true);
+      const url = await uploadImage(pendingImage.file);
+      setIsUploading(false);
+      if (!url) return; // upload failed or limit reached
+      imageUrl = url;
+      setPendingImage(null);
+    }
+
+    sendMessage(input, examMode, imageUrl);
     setInput("");
   };
 
@@ -34,6 +48,17 @@ export default function Assistant() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      return;
+    }
+    const preview = URL.createObjectURL(file);
+    setPendingImage({ file, preview });
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const toggleRecording = () => {
@@ -49,7 +74,7 @@ export default function Assistant() {
     const recognition = new SR();
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       setInput((prev) => prev + " " + transcript);
     };
@@ -77,7 +102,9 @@ export default function Assistant() {
           </div>
           <div>
             <h1 className="font-semibold">AI Study Assistant</h1>
-            <p className="text-xs text-muted-foreground">{profile?.daily_uploads_remaining ?? 0} questions remaining today</p>
+            <p className="text-xs text-muted-foreground">
+              {profile?.daily_uploads_remaining ?? 0} photo uploads remaining today • Unlimited questions
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -103,13 +130,13 @@ export default function Assistant() {
             <p className="text-muted-foreground text-sm max-w-md">
               {examMode
                 ? "Exam Mode is ON — I'll focus on quick revision, formulas, and practice questions."
-                : "Ask me anything! I can generate notes, explain concepts, solve problems, and more."}
+                : "Ask me anything! I can generate notes, explain concepts, solve problems, and more. Upload photos of your notes or questions too!"}
             </p>
             <div className="flex flex-wrap gap-2 mt-6 max-w-lg justify-center">
               {["Explain quantum physics", "Generate study notes for biology", "Create practice questions for math", "Summarize Chapter 5"].map((q) => (
                 <button
                   key={q}
-                  onClick={() => { setInput(q); }}
+                  onClick={() => setInput(q)}
                   className="text-sm px-3 py-1.5 rounded-full border border-border hover:bg-accent transition-colors"
                 >
                   {q}
@@ -132,6 +159,9 @@ export default function Assistant() {
                   ? "gradient-primary text-primary-foreground"
                   : "bg-muted"
               }`}>
+                {msg.imageUrl && (
+                  <img src={msg.imageUrl} alt="Uploaded" className="max-w-full max-h-60 rounded-lg mb-2" />
+                )}
                 {msg.role === "assistant" ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -164,9 +194,40 @@ export default function Assistant() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Pending image preview */}
+      {pendingImage && (
+        <div className="px-4 pb-2">
+          <div className="relative inline-block">
+            <img src={pendingImage.preview} alt="Preview" className="h-20 rounded-lg border border-border" />
+            <button
+              onClick={() => setPendingImage(null)}
+              className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-4 border-t border-border">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
         <div className="flex items-end gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            className="shrink-0"
+            title="Upload photo"
+          >
+            <ImagePlus className="h-4 w-4" />
+          </Button>
           <Button
             variant={isRecording ? "destructive" : "outline"}
             size="icon"
@@ -185,11 +246,11 @@ export default function Assistant() {
           />
           <Button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={(!input.trim() && !pendingImage) || isLoading || isUploading}
             className="gradient-primary shrink-0"
             size="icon"
           >
-            <Send className="h-4 w-4" />
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
       </div>

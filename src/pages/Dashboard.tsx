@@ -15,7 +15,7 @@ export default function Dashboard() {
 
   const stats = [
     { icon: Coins, label: "Total Credits", value: profile?.total_credits ?? 0, color: "text-warning" },
-    { icon: Upload, label: "AI Uploads Left", value: profile?.daily_uploads_remaining ?? 0, color: "text-primary" },
+    { icon: Upload, label: "Photo Uploads Left", value: profile?.daily_uploads_remaining ?? 0, color: "text-primary" },
     { icon: CheckCircle, label: "Tasks Done Today", value: `${completedCount}/${tasks.length}`, color: "text-success" },
     { icon: Flame, label: "Study Streak", value: `${profile?.streak_count ?? 0} days`, color: "text-destructive" },
   ];
@@ -25,7 +25,7 @@ export default function Dashboard() {
       {/* Welcome */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold">
-          Welcome back, <span className="gradient-text">{profile?.display_name || user?.email?.split("@")[0]}</span>
+          Welcome back, <span className="gradient-text">{profile?.display_name || "Student"}</span>
         </h1>
         <p className="text-muted-foreground mt-1">Ready to study? Here's your dashboard overview.</p>
       </motion.div>
@@ -115,7 +115,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <h3 className="font-semibold">Credits & Upgrades</h3>
-                <p className="text-sm text-muted-foreground">Manage credits and upgrade AI usage</p>
+                <p className="text-sm text-muted-foreground">Manage credits and upgrade photo uploads</p>
               </div>
             </CardContent>
           </Link>
