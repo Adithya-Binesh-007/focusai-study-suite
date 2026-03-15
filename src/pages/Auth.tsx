@@ -12,7 +12,7 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -34,7 +34,7 @@ export default function Auth() {
           email,
           password,
           options: {
-            data: { display_name: displayName || username },
+            data: { display_name: username },
           },
         });
         if (error) throw error;
@@ -66,13 +66,6 @@ export default function Auth() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && (
-                <Input
-                  placeholder="Display name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                />
-              )}
               <Input
                 placeholder="Username"
                 value={username}
