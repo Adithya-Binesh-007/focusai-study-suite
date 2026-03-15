@@ -30,12 +30,20 @@ function AppSidebarContent() {
     <Sidebar collapsible="icon">
       <SidebarContent className="flex flex-col h-full">
         {/* Logo */}
-        <div className="p-4 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center shrink-0">
-            <Brain className="h-4 w-4 text-primary-foreground" />
-          </div>
-          {!collapsed && <span className="font-bold text-lg">FocusAI</span>}
-        </div>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton className="pointer-events-none">
+                  <div className="w-5 h-5 rounded-md gradient-primary flex items-center justify-center shrink-0">
+                    <Brain className="h-3 w-3 text-primary-foreground" />
+                  </div>
+                  {!collapsed && <span className="font-bold text-lg">FocusAI</span>}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         <SidebarGroup>
           <SidebarGroupContent>
