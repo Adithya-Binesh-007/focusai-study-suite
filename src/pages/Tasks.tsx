@@ -114,18 +114,18 @@ export default function Tasks() {
                           {trackableInfo.actionLabel}
                         </Button>
                       )}
-                      {/* For off-site (non-trackable) tasks, show manual Claim */}
-                      {!trackable && !task.is_completed && (
+                      {/* Claim button for all incomplete tasks (enabled when completable) */}
+                      {!task.is_completed && (
                         <Button
                           size="sm"
-                          className="gradient-primary"
+                          className={completable ? "gradient-primary" : ""}
+                          variant={completable ? "default" : "outline"}
                           onClick={() => completeTask.mutate(task.id)}
-                          disabled={completeTask.isPending}
+                          disabled={completeTask.isPending || !completable}
                         >
-                          Claim
+                          {trackable && !completable ? "Locked" : "Claim"}
                         </Button>
                       )}
-                      {/* Completed badge */}
                       {task.is_completed && (
                         <Badge className="bg-success/10 text-success border-success/20">Done ✓</Badge>
                       )}
