@@ -12,7 +12,7 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
