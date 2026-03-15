@@ -102,8 +102,8 @@ export default function Tasks() {
                         <Coins className="h-3 w-3 text-warning" />
                         +{task.credits_reward}
                       </div>
-                      {/* Action button for trackable tasks - navigate to the relevant page */}
-                      {trackable && !task.is_completed && trackableInfo?.route && !isFullyTracked && (
+                      {/* For incomplete trackable tasks not yet done: show "Go to..." button */}
+                      {trackable && !task.is_completed && !isFullyTracked && trackableInfo?.route && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -114,16 +114,15 @@ export default function Tasks() {
                           {trackableInfo.actionLabel}
                         </Button>
                       )}
-                      {/* Claim button for all incomplete tasks (enabled when completable) */}
-                      {!task.is_completed && (
+                      {/* Claim button - only show when task is completable */}
+                      {!task.is_completed && completable && (
                         <Button
                           size="sm"
-                          className={completable ? "gradient-primary" : ""}
-                          variant={completable ? "default" : "outline"}
+                          className="gradient-primary"
                           onClick={() => completeTask.mutate(task.id)}
-                          disabled={completeTask.isPending || !completable}
+                          disabled={completeTask.isPending}
                         >
-                          {trackable && !completable ? "Locked" : "Claim"}
+                          Claim
                         </Button>
                       )}
                       {task.is_completed && (
