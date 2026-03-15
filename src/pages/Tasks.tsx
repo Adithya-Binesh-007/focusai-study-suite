@@ -1,10 +1,12 @@
 import { useTasks } from "@/hooks/useTasks";
+import { TRACKABLE_TASKS } from "@/hooks/useTaskProgress";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { CheckCircle, Clock, Coins, Star, Lock } from "lucide-react";
+import { CheckCircle, Clock, Coins, Star, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const difficultyColors = {
   easy: "bg-success/10 text-success border-success/20",
@@ -13,7 +15,8 @@ const difficultyColors = {
 };
 
 export default function Tasks() {
-  const { tasks, isLoading, completeTask, completedCount, totalCreditsToday, getTaskProgress, isTrackableTask, canComplete } = useTasks();
+  const { tasks, isLoading, completedCount, totalCreditsToday, getTaskProgress, isTrackableTask, canComplete, completeTask } = useTasks();
+  const navigate = useNavigate();
 
   if (isLoading) {
     return <div className="p-6 flex items-center justify-center"><Clock className="h-6 w-6 animate-spin" /></div>;
@@ -52,10 +55,12 @@ export default function Tasks() {
         {tasks.map((task, i) => {
           const progress = getTaskProgress(task.id);
           const trackable = isTrackableTask(task.title);
+          const trackableInfo = TRACKABLE_TASKS[task.title];
           const completable = canComplete(task);
           const progressPercent = progress
             ? Math.min((progress.current_count / progress.target_count) * 100, 100)
             : 0;
+          const isFullyTracked = progress && progress.current_count >= progress.target_count;
 
           return (
             <motion.div
@@ -97,20 +102,32 @@ export default function Tasks() {
                         <Coins className="h-3 w-3 text-warning" />
                         +{task.credits_reward}
                       </div>
-                      {!task.is_completed && (
+                      {/* Action button for trackable tasks - navigate to the relevant page */}
+                      {trackable && !task.is_completed && trackableInfo?.route && !isFullyTracked && (
                         <Button
                           size="sm"
-                          className={completable ? "gradient-primary" : ""}
-                          variant={completable ? "default" : "outline"}
-                          onClick={() => completeTask.mutate(task.id)}
-                          disabled={completeTask.isPending || !completable}
+                          variant="outline"
+                          className="border-primary/30 text-primary hover:bg-primary/10"
+                          onClick={() => navigate(trackableInfo.route!)}
                         >
-                          {trackable && !completable ? (
-                            <><Lock className="h-3 w-3 mr-1" /> Locked</>
-                          ) : (
-                            "Claim"
-                          )}
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          {trackableInfo.actionLabel}
                         </Button>
+                      )}
+                      {/* For off-site (non-trackable) tasks, show manual Claim */}
+                      {!trackable && !task.is_completed && (
+                        <Button
+                          size="sm"
+                          className="gradient-primary"
+                          onClick={() => completeTask.mutate(task.id)}
+                          disabled={completeTask.isPending}
+                        >
+                          Claim
+                        </Button>
+                      )}
+                      {/* Completed badge */}
+                      {task.is_completed && (
+                        <Badge className="bg-success/10 text-success border-success/20">Done ✓</Badge>
                       )}
                     </div>
                   </div>
