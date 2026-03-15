@@ -34,7 +34,7 @@ export default function Auth() {
           email,
           password,
           options: {
-            data: { display_name: displayName || username },
+            data: { display_name: username },
           },
         });
         if (error) throw error;
