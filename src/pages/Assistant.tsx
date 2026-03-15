@@ -155,7 +155,7 @@ export default function Assistant() {
                 : "Ask me anything! I can generate notes, explain concepts, solve problems, and more. Upload photos of your notes too!"}
             </p>
             <div className="flex flex-wrap gap-2 mt-6 max-w-lg justify-center">
-              {["Explain quantum physics", "Generate study notes for biology", "Create practice questions for math", "Summarize Chapter 5"].map((q) => (
+              {["Explain quantum physics", "Generate study notes for biology", "Create practice questions for math"].map((q) => (
                 <button
                   key={q}
                   onClick={() => setInput(q)}
