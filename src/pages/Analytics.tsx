@@ -88,7 +88,7 @@ export default function Analytics() {
   const currentStreak = profile?.streak_count ?? 0;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 h-full overflow-auto">
       <div>
         <h1 className="text-3xl font-bold">Study Analytics</h1>
         <p className="text-muted-foreground mt-1">Track your productivity and progress over time.</p>

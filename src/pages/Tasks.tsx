@@ -23,7 +23,7 @@ export default function Tasks() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 h-full overflow-auto">
       <div>
         <h1 className="text-3xl font-bold">Daily Tasks</h1>
         <p className="text-muted-foreground mt-1">Complete tasks to earn credits. On-site tasks track your progress automatically.</p>
