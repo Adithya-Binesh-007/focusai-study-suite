@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,13 +16,56 @@ export function useChat() {
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [conversationId] = useState(() => crypto.randomUUID());
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const loadedRef = useRef(false);
+
+  // Load most recent conversation on mount
+  useEffect(() => {
+    if (!user || loadedRef.current) return;
+    loadedRef.current = true;
+
+    (async () => {
+      // Find the latest conversation_id for this user
+      const { data: latest } = await supabase
+        .from("chat_messages")
+        .select("conversation_id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (latest?.conversation_id) {
+        setConversationId(latest.conversation_id);
+        // Load all messages from that conversation
+        const { data: msgs } = await supabase
+          .from("chat_messages")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("conversation_id", latest.conversation_id)
+          .order("created_at", { ascending: true });
+
+        if (msgs && msgs.length > 0) {
+          setMessages(
+            msgs.map((m) => ({
+              id: m.id,
+              role: m.role as "user" | "assistant",
+              content: m.content,
+              imageUrl: m.role === "user" && m.content.startsWith("[Image: ")
+                ? m.content.match(/\[Image: (.+?)\]/)?.[1]
+                : undefined,
+            }))
+          );
+        }
+      } else {
+        setConversationId(crypto.randomUUID());
+      }
+    })();
+  }, [user]);
 
   const uploadImage = useCallback(
     async (file: File): Promise<string | null> => {
       if (!user) return null;
 
-      // Check daily uploads for photo uploads only
       const { data: profile } = await supabase
         .from("profiles")
         .select("daily_uploads_remaining")
@@ -46,7 +89,6 @@ export function useChat() {
         return null;
       }
 
-      // Decrement daily uploads (only for photo uploads)
       await supabase
         .from("profiles")
         .update({ daily_uploads_remaining: (profile.daily_uploads_remaining ?? 1) - 1 })
@@ -61,15 +103,12 @@ export function useChat() {
 
   const sendMessage = useCallback(
     async (input: string, examMode = false, imageUrl?: string) => {
-      if (!user || (!input.trim() && !imageUrl)) return;
-
-      // Questions are unlimited — no daily limit check for text-only messages
+      if (!user || (!input.trim() && !imageUrl) || !conversationId) return;
 
       const userMsg: ChatMessage = { role: "user", content: input, imageUrl };
       setMessages((prev) => [...prev, userMsg]);
       setIsLoading(true);
 
-      // Save user message
       await supabase.from("chat_messages").insert({
         user_id: user.id,
         conversation_id: conversationId,
@@ -151,7 +190,6 @@ export function useChat() {
           }
         }
 
-        // Save assistant message
         if (assistantSoFar) {
           await supabase.from("chat_messages").insert({
             user_id: user.id,
@@ -170,7 +208,10 @@ export function useChat() {
     [user, messages, conversationId, queryClient]
   );
 
-  const clearChat = () => setMessages([]);
+  const clearChat = useCallback(() => {
+    setMessages([]);
+    setConversationId(crypto.randomUUID());
+  }, []);
 
   return { messages, isLoading, sendMessage, clearChat, uploadImage };
 }
