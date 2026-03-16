@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import type { Tables } from "@/integrations/supabase/types";
 
 export interface ChatMessage {
   id?: string;
@@ -11,56 +12,182 @@ export interface ChatMessage {
   imageUrl?: string;
 }
 
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  preview: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+type ChatMessageRow = Tables<"chat_messages">;
+
+const IMAGE_PREFIX_REGEX = /^\[Image: (.+?)\]\n?/s;
+
+const trimText = (value: string, maxLength: number) => {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+};
+
+const parseStoredMessage = (content: string) => {
+  const match = content.match(IMAGE_PREFIX_REGEX);
+
+  if (!match) {
+    return { content, imageUrl: undefined as string | undefined };
+  }
+
+  const cleanContent = content.replace(IMAGE_PREFIX_REGEX, "").trimStart();
+  return {
+    content: cleanContent || "Photo upload",
+    imageUrl: match[1],
+  };
+};
+
+const buildConversationSummaries = (
+  rows: Pick<ChatMessageRow, "conversation_id" | "role" | "content" | "created_at">[],
+) => {
+  const summaries = new Map<string, ConversationSummary>();
+
+  rows.forEach((row) => {
+    const parsed = parseStoredMessage(row.content);
+    const text = parsed.content || (parsed.imageUrl ? "Photo upload" : "Empty message");
+
+    if (!summaries.has(row.conversation_id)) {
+      summaries.set(row.conversation_id, {
+        id: row.conversation_id,
+        title: row.role === "user" ? trimText(text, 36) : "New conversation",
+        preview: trimText(text, 72),
+        updatedAt: row.created_at,
+        messageCount: 1,
+      });
+      return;
+    }
+
+    const existing = summaries.get(row.conversation_id)!;
+    existing.messageCount += 1;
+
+    if (row.role === "user") {
+      existing.title = trimText(text, 36);
+    }
+  });
+
+  return Array.from(summaries.values()).sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  );
+};
+
 export function useChat() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const loadedRef = useRef(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  // Load most recent conversation on mount
-  useEffect(() => {
-    if (!user || loadedRef.current) return;
-    loadedRef.current = true;
+  const loadConversation = useCallback(
+    async (conversationId: string) => {
+      if (!user) return;
 
-    (async () => {
-      // Find the latest conversation_id for this user
-      const { data: latest } = await supabase
+      const { data, error } = await supabase
         .from("chat_messages")
-        .select("conversation_id")
+        .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true });
 
-      if (latest?.conversation_id) {
-        setConversationId(latest.conversation_id);
-        // Load all messages from that conversation
-        const { data: msgs } = await supabase
-          .from("chat_messages")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("conversation_id", latest.conversation_id)
-          .order("created_at", { ascending: true });
-
-        if (msgs && msgs.length > 0) {
-          setMessages(
-            msgs.map((m) => ({
-              id: m.id,
-              role: m.role as "user" | "assistant",
-              content: m.content,
-              imageUrl: m.role === "user" && m.content.startsWith("[Image: ")
-                ? m.content.match(/\[Image: (.+?)\]/)?.[1]
-                : undefined,
-            }))
-          );
-        }
-      } else {
-        setConversationId(crypto.randomUUID());
+      if (error) {
+        toast({ title: "Error", description: "Failed to load conversation", variant: "destructive" });
+        return;
       }
-    })();
-  }, [user]);
+
+      setMessages(
+        (data ?? []).map((message) => {
+          const parsed = parseStoredMessage(message.content);
+          return {
+            id: message.id,
+            role: message.role as "user" | "assistant",
+            content: parsed.content,
+            imageUrl: parsed.imageUrl,
+          };
+        }),
+      );
+    },
+    [user],
+  );
+
+  const refreshConversations = useCallback(
+    async (nextActiveConversationId?: string | null) => {
+      if (!user) return [] as ConversationSummary[];
+
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("conversation_id, role, content, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        toast({ title: "Error", description: "Failed to load conversations", variant: "destructive" });
+        return [] as ConversationSummary[];
+      }
+
+      const nextConversations = buildConversationSummaries(data ?? []);
+      setConversations(nextConversations);
+
+      const nextId = nextActiveConversationId ?? activeConversationId;
+      if (nextId && !nextConversations.some((conversation) => conversation.id === nextId)) {
+        setActiveConversationId(nextConversations[0]?.id ?? crypto.randomUUID());
+      }
+
+      return nextConversations;
+    },
+    [user, activeConversationId],
+  );
+
+  useEffect(() => {
+    if (!user) {
+      setMessages([]);
+      setConversations([]);
+      setActiveConversationId(null);
+      setIsInitializing(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const initialize = async () => {
+      setIsInitializing(true);
+      const nextConversations = await refreshConversations();
+      if (cancelled) return;
+
+      if (nextConversations.length > 0) {
+        const latestConversationId = nextConversations[0].id;
+        setActiveConversationId(latestConversationId);
+        await loadConversation(latestConversationId);
+      } else {
+        setActiveConversationId(crypto.randomUUID());
+        setMessages([]);
+      }
+
+      if (!cancelled) {
+        setIsInitializing(false);
+      }
+    };
+
+    initialize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, refreshConversations, loadConversation]);
+
+  const selectConversation = useCallback(
+    async (conversationId: string) => {
+      setActiveConversationId(conversationId);
+      await loadConversation(conversationId);
+    },
+    [loadConversation],
+  );
 
   const uploadImage = useCallback(
     async (file: File): Promise<string | null> => {
@@ -98,67 +225,79 @@ export function useChat() {
       const { data: urlData } = supabase.storage.from("chat-uploads").getPublicUrl(path);
       return urlData.publicUrl;
     },
-    [user, queryClient]
+    [user, queryClient],
   );
 
   const sendMessage = useCallback(
     async (input: string, examMode = false, imageUrl?: string) => {
-      if (!user || (!input.trim() && !imageUrl) || !conversationId) return;
+      if (!user || (!input.trim() && !imageUrl) || !activeConversationId) return;
 
-      const userMsg: ChatMessage = { role: "user", content: input, imageUrl };
-      setMessages((prev) => [...prev, userMsg]);
+      const userMessage: ChatMessage = {
+        role: "user",
+        content: input.trim() || "Photo upload",
+        imageUrl,
+      };
+
+      const nextMessages = [...messages, userMessage];
+      setMessages(nextMessages);
       setIsLoading(true);
 
       await supabase.from("chat_messages").insert({
         user_id: user.id,
-        conversation_id: conversationId,
+        conversation_id: activeConversationId,
         role: "user",
         content: imageUrl ? `[Image: ${imageUrl}]\n${input}` : input,
       });
 
+      await refreshConversations(activeConversationId);
+
       let assistantSoFar = "";
       const upsertAssistant = (chunk: string) => {
         assistantSoFar += chunk;
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last?.role === "assistant") {
-            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
+        setMessages((currentMessages) => {
+          const lastMessage = currentMessages[currentMessages.length - 1];
+          if (lastMessage?.role === "assistant") {
+            return currentMessages.map((message, index) =>
+              index === currentMessages.length - 1 ? { ...message, content: assistantSoFar } : message,
+            );
           }
-          return [...prev, { role: "assistant", content: assistantSoFar }];
+
+          return [...currentMessages, { role: "assistant", content: assistantSoFar }];
         });
       };
 
       try {
-        const allMessages = [...messages, userMsg].map((m) => ({
-          role: m.role,
-          content: m.imageUrl ? `[Image: ${m.imageUrl}]\n${m.content}` : m.content,
+        const allMessages = nextMessages.map((message) => ({
+          role: message.role,
+          content: message.imageUrl ? `[Image: ${message.imageUrl}]\n${message.content}` : message.content,
         }));
 
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-            body: JSON.stringify({ messages: allMessages, examMode }),
-          }
-        );
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ messages: allMessages, examMode }),
+        });
 
-        if (resp.status === 429) {
+        if (response.status === 429) {
           toast({ title: "Rate Limited", description: "Too many requests. Please wait a moment.", variant: "destructive" });
           setIsLoading(false);
           return;
         }
-        if (resp.status === 402) {
+
+        if (response.status === 402) {
           toast({ title: "Credits Required", description: "Please add funds to continue using AI.", variant: "destructive" });
           setIsLoading(false);
           return;
         }
-        if (!resp.ok || !resp.body) throw new Error("Failed to start stream");
 
-        const reader = resp.body.getReader();
+        if (!response.ok || !response.body) {
+          throw new Error("Failed to start stream");
+        }
+
+        const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let textBuffer = "";
         let streamDone = false;
@@ -177,14 +316,17 @@ export function useChat() {
             if (!line.startsWith("data: ")) continue;
 
             const jsonStr = line.slice(6).trim();
-            if (jsonStr === "[DONE]") { streamDone = true; break; }
+            if (jsonStr === "[DONE]") {
+              streamDone = true;
+              break;
+            }
 
             try {
               const parsed = JSON.parse(jsonStr);
               const content = parsed.choices?.[0]?.delta?.content;
               if (content) upsertAssistant(content);
             } catch {
-              textBuffer = line + "\n" + textBuffer;
+              textBuffer = `${line}\n${textBuffer}`;
               break;
             }
           }
@@ -193,25 +335,38 @@ export function useChat() {
         if (assistantSoFar) {
           await supabase.from("chat_messages").insert({
             user_id: user.id,
-            conversation_id: conversationId,
+            conversation_id: activeConversationId,
             role: "assistant",
             content: assistantSoFar,
           });
         }
-      } catch (e) {
-        console.error("Chat error:", e);
+
+        await refreshConversations(activeConversationId);
+      } catch (error) {
+        console.error("Chat error:", error);
         toast({ title: "Error", description: "Failed to get AI response", variant: "destructive" });
       } finally {
         setIsLoading(false);
       }
     },
-    [user, messages, conversationId, queryClient]
+    [user, activeConversationId, messages, queryClient, refreshConversations],
   );
 
   const clearChat = useCallback(() => {
+    const nextConversationId = crypto.randomUUID();
+    setActiveConversationId(nextConversationId);
     setMessages([]);
-    setConversationId(crypto.randomUUID());
   }, []);
 
-  return { messages, isLoading, sendMessage, clearChat, uploadImage };
+  return {
+    messages,
+    conversations,
+    activeConversationId,
+    isLoading,
+    isInitializing,
+    sendMessage,
+    clearChat,
+    selectConversation,
+    uploadImage,
+  };
 }

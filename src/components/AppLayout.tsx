@@ -1,9 +1,17 @@
-import { ReactNode } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { ReactNode, useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu,
-  SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
@@ -24,21 +32,19 @@ function AppSidebarContent() {
   const collapsed = state === "collapsed";
   const { signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const location = useLocation();
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarContent className="flex flex-col h-full">
-        {/* Logo */}
+      <SidebarContent className="flex h-full flex-col">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton className="pointer-events-none">
-                  <div className="w-5 h-5 rounded-md gradient-primary flex items-center justify-center shrink-0">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md gradient-primary">
                     <Brain className="h-3 w-3 text-primary-foreground" />
                   </div>
-                  {!collapsed && <span className="font-bold text-lg">FocusAI</span>}
+                  {!collapsed && <span className="text-lg font-bold">FocusAI</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -55,7 +61,7 @@ function AppSidebarContent() {
                       to={item.url}
                       end
                       className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      activeClassName="bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
@@ -67,12 +73,17 @@ function AppSidebarContent() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <div className="mt-auto p-4 space-y-2">
+        <div className="mt-auto space-y-2 p-4">
           <Button variant="ghost" size={collapsed ? "icon" : "default"} onClick={toggleTheme} className="w-full justify-start">
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {!collapsed && <span className="ml-2">{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>}
           </Button>
-          <Button variant="ghost" size={collapsed ? "icon" : "default"} onClick={signOut} className="w-full justify-start text-destructive hover:text-destructive">
+          <Button
+            variant="ghost"
+            size={collapsed ? "icon" : "default"}
+            onClick={signOut}
+            className="w-full justify-start text-destructive hover:text-destructive"
+          >
             <LogOut className="h-4 w-4" />
             {!collapsed && <span className="ml-2">Sign Out</span>}
           </Button>
@@ -85,9 +96,22 @@ function AppSidebarContent() {
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
 
+  useEffect(() => {
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <Skeleton className="h-12 w-48" />
       </div>
     );
@@ -98,14 +122,14 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SidebarProvider>
-      <div className="h-screen flex w-full overflow-hidden">
+    <SidebarProvider className="h-screen overflow-hidden">
+      <div className="flex h-full min-h-0 w-full overflow-hidden">
         <AppSidebarContent />
-        <div className="flex-1 flex flex-col">
-          <header className="h-12 flex items-center border-b border-border px-2">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <header className="flex h-12 shrink-0 items-center border-b border-border px-2">
             <SidebarTrigger />
           </header>
-          <main className="flex-1 overflow-hidden">{children}</main>
+          <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
         </div>
       </div>
     </SidebarProvider>
