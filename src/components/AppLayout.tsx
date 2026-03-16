@@ -101,11 +101,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <SidebarProvider>
       <div className="h-screen flex w-full overflow-hidden">
         <AppSidebarContent />
-        <div className="flex-1 flex flex-col">
-          <header className="h-12 flex items-center border-b border-border px-2">
+        <div className="flex-1 flex min-h-0 flex-col">
+          <header className="flex h-12 shrink-0 items-center border-b border-border px-2">
             <SidebarTrigger />
           </header>
-          <main className="flex-1 overflow-hidden">{children}</main>
+          <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
         </div>
       </div>
     </SidebarProvider>

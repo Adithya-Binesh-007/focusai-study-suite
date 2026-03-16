@@ -1,20 +1,51 @@
 import { useState, useRef, useEffect } from "react";
-import { useChat, ChatMessage } from "@/hooks/useChat";
+import { useChat } from "@/hooks/useChat";
 import { useProfile } from "@/hooks/useProfile";
 import { useTaskProgress } from "@/hooks/useTaskProgress";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Send, Trash2, Download, Brain, GraduationCap, Loader2, ImagePlus } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Send,
+  Download,
+  Brain,
+  GraduationCap,
+  Loader2,
+  ImagePlus,
+  MessageSquarePlus,
+  MessagesSquare,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import jsPDF from "jspdf";
 
+const formatConversationTime = (value: string) => {
+  const date = new Date(value);
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+
+  return sameDay
+    ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date)
+    : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
+};
+
 export default function Assistant() {
-  const { messages, isLoading, sendMessage, clearChat, uploadImage } = useChat();
+  const {
+    messages,
+    conversations,
+    activeConversationId,
+    isLoading,
+    isInitializing,
+    sendMessage,
+    clearChat,
+    selectConversation,
+    uploadImage,
+  } = useChat();
   const { profile } = useProfile();
   const { incrementProgress } = useTaskProgress();
   const [input, setInput] = useState("");
@@ -23,15 +54,19 @@ export default function Assistant() {
   const [pendingImage, setPendingImage] = useState<{ file: File; preview: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [examModeTracked, setExamModeTracked] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const container = messagesContainerRef.current;
+    if (!container) return;
 
-  // Track exam mode usage
+    requestAnimationFrame(() => {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    });
+  }, [messages, activeConversationId]);
+
   useEffect(() => {
     if (examMode && !examModeTracked) {
       incrementProgress("exam_mode_use");
@@ -40,7 +75,7 @@ export default function Assistant() {
   }, [examMode, examModeTracked, incrementProgress]);
 
   const handleSend = async () => {
-    if ((!input.trim() && !pendingImage) || isLoading) return;
+    if ((!input.trim() && !pendingImage) || isLoading || isInitializing) return;
 
     let imageUrl: string | undefined;
     if (pendingImage) {
@@ -50,36 +85,32 @@ export default function Assistant() {
       if (!url) return;
       imageUrl = url;
       setPendingImage(null);
-      // Track photo upload
       incrementProgress("photo_upload");
     }
 
-    sendMessage(input, examMode, imageUrl);
+    await sendMessage(input, examMode, imageUrl);
     setInput("");
-
-    // Track AI question asked
     incrementProgress("ai_questions");
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
       handleSend();
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return;
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+
     const preview = URL.createObjectURL(file);
     setPendingImage({ file, preview });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleClearChat = () => {
+  const handleNewConversation = () => {
     clearChat();
-    // Track new conversation
     incrementProgress("new_conversation");
   };
 
@@ -89,14 +120,16 @@ export default function Assistant() {
       setIsRecording(false);
       return;
     }
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const recognition = new SR();
+
+    const SpeechRecognitionApi = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionApi) return;
+
+    const recognition = new SpeechRecognitionApi();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
-      setInput((prev) => prev + " " + transcript);
+      setInput((previous) => `${previous} ${transcript}`.trim());
     };
     recognition.onend = () => setIsRecording(false);
     recognition.start();
@@ -110,172 +143,240 @@ export default function Assistant() {
     const lines = doc.splitTextToSize(content, 180);
     doc.text(lines, 15, 20);
     doc.save("focusai-notes.pdf");
-    // Track PDF download
     incrementProgress("pdf_download");
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-            <Brain className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="font-semibold">AI Study Assistant</h1>
-            <p className="text-xs text-muted-foreground">
-              {profile?.daily_uploads_remaining ?? 0} photo uploads remaining • Unlimited questions
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <GraduationCap className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Exam Mode</span>
-            <Switch checked={examMode} onCheckedChange={setExamMode} />
-          </div>
-          <Button variant="ghost" size="icon" onClick={handleClearChat}>
-            <Trash2 className="h-4 w-4" />
+    <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[18rem_minmax(0,1fr)]">
+      <aside className="hidden min-h-0 border-r border-border bg-card/40 md:flex md:flex-col">
+        <div className="border-b border-border p-4">
+          <Button variant="outline" className="w-full justify-start" onClick={handleNewConversation}>
+            <MessageSquarePlus className="h-4 w-4" />
+            New chat
           </Button>
         </div>
-      </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mb-4">
-              <Brain className="h-8 w-8 text-primary-foreground" />
-            </div>
-            <h2 className="text-xl font-semibold mb-2">How can I help you study?</h2>
-            <p className="text-muted-foreground text-sm max-w-md">
-              {examMode
-                ? "Exam Mode is ON — I'll focus on quick revision, formulas, and practice questions."
-                : "Ask me anything! I can generate notes, explain concepts, solve problems, and more. Upload photos of your notes too!"}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-6 max-w-lg justify-center">
-              {["Explain quantum physics", "Generate study notes for biology", "Create practice questions for math"].map((q) => (
-                <button
-                  key={q}
-                  onClick={() => setInput(q)}
-                  className="text-sm px-3 py-1.5 rounded-full border border-border hover:bg-accent transition-colors"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <AnimatePresence>
-          {messages.map((msg, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                msg.role === "user"
-                  ? "gradient-primary text-primary-foreground"
-                  : "bg-muted"
-              }`}>
-                {msg.imageUrl && (
-                  <img src={msg.imageUrl} alt="Uploaded" className="max-w-full max-h-60 rounded-lg mb-2" />
-                )}
-                {msg.role === "assistant" ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                      {msg.content}
-                    </ReactMarkdown>
-                    <div className="mt-2 flex justify-end">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs"
-                        onClick={() => downloadPDF(msg.content)}
-                      >
-                        <Download className="h-3 w-3 mr-1" /> PDF
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm">{msg.content}</p>
-                )}
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="space-y-1">
+            {conversations.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                Start a chat and your conversation history will appear here.
               </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+            ) : (
+              conversations.map((conversation) => {
+                const isActive = conversation.id === activeConversationId;
+                return (
+                  <button
+                    key={conversation.id}
+                    onClick={() => selectConversation(conversation.id)}
+                    className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
+                      isActive
+                        ? "border-primary/30 bg-accent text-accent-foreground"
+                        : "border-transparent hover:bg-muted"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="line-clamp-1 text-sm font-medium">{conversation.title}</p>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {formatConversationTime(conversation.updatedAt)}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{conversation.preview}</p>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </aside>
 
-        {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-2xl px-4 py-3">
-              <Loader2 className="h-4 w-4 animate-spin" />
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+        <div className="shrink-0 border-b border-border p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
+                <Brain className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="font-semibold">AI Study Assistant</h1>
+                <p className="text-xs text-muted-foreground">
+                  {profile?.daily_uploads_remaining ?? 0} photo uploads remaining • Unlimited questions
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 md:gap-4">
+              <Button variant="outline" size="sm" className="md:hidden" onClick={handleNewConversation}>
+                <MessageSquarePlus className="h-4 w-4" />
+                New
+              </Button>
+              <div className="flex items-center gap-2">
+                <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                <span className="hidden text-sm text-muted-foreground sm:inline">Exam Mode</span>
+                <Switch checked={examMode} onCheckedChange={setExamMode} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="shrink-0 border-b border-border p-2 md:hidden">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {conversations.length === 0 ? (
+              <div className="flex min-h-14 items-center rounded-xl border border-dashed border-border px-3 text-xs text-muted-foreground">
+                No saved chats yet
+              </div>
+            ) : (
+              conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  onClick={() => selectConversation(conversation.id)}
+                  className={`min-w-56 rounded-xl border px-3 py-2 text-left ${
+                    conversation.id === activeConversationId
+                      ? "border-primary/30 bg-accent text-accent-foreground"
+                      : "border-border bg-card"
+                  }`}
+                >
+                  <p className="line-clamp-1 text-sm font-medium">{conversation.title}</p>
+                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{conversation.preview}</p>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto p-4">
+          {isInitializing ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Loading your conversation…
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl gradient-primary">
+                <MessagesSquare className="h-8 w-8 text-primary-foreground" />
+              </div>
+              <h2 className="mb-2 text-xl font-semibold">How can I help you study?</h2>
+              <p className="max-w-md text-sm text-muted-foreground">
+                {examMode
+                  ? "Exam Mode is ON — I’ll focus on quick revision, formulas, and practice questions."
+                  : "Ask me anything! I can generate notes, explain concepts, solve problems, and more. Upload photos of your notes too!"}
+              </p>
+              <div className="mt-6 flex max-w-lg flex-wrap justify-center gap-2">
+                {["Explain quantum physics", "Generate study notes for biology", "Create practice questions for math"].map((question) => (
+                  <button
+                    key={question}
+                    onClick={() => setInput(question)}
+                    className="rounded-full border border-border px-3 py-1.5 text-sm transition-colors hover:bg-accent"
+                  >
+                    {question}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <AnimatePresence initial={false}>
+                {messages.map((message, index) => (
+                  <motion.div
+                    key={message.id ?? `${message.role}-${index}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                        message.role === "user" ? "gradient-primary text-primary-foreground" : "bg-muted"
+                      }`}
+                    >
+                      {message.imageUrl && (
+                        <img src={message.imageUrl} alt="Uploaded study material" className="mb-2 max-h-60 max-w-full rounded-lg" />
+                      )}
+                      {message.role === "assistant" ? (
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                          <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                            {message.content}
+                          </ReactMarkdown>
+                          <div className="mt-2 flex justify-end">
+                            <Button variant="ghost" size="sm" className="text-xs" onClick={() => downloadPDF(message.content)}>
+                              <Download className="mr-1 h-3 w-3" /> PDF
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm">{message.content}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
+                <div className="flex justify-start">
+                  <div className="rounded-2xl bg-muted px-4 py-3">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {pendingImage && (
+          <div className="shrink-0 px-4 pb-2">
+            <div className="relative inline-block">
+              <img src={pendingImage.preview} alt="Selected upload preview" className="h-20 rounded-lg border border-border" />
+              <button
+                onClick={() => setPendingImage(null)}
+                className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground"
+              >
+                ×
+              </button>
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
-      </div>
 
-      {/* Pending image preview */}
-      {pendingImage && (
-        <div className="px-4 pb-2">
-          <div className="relative inline-block">
-            <img src={pendingImage.preview} alt="Preview" className="h-20 rounded-lg border border-border" />
-            <button
-              onClick={() => setPendingImage(null)}
-              className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Input */}
-      <div className="p-4 border-t border-border">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        <div className="flex items-end gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            className="shrink-0"
-            title="Upload photo"
-          >
-            <ImagePlus className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={isRecording ? "destructive" : "outline"}
-            size="icon"
-            onClick={toggleRecording}
-            className="shrink-0"
-          >
-            {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={examMode ? "Ask for revision notes, formulas, or practice questions..." : "Ask anything about your studies..."}
-            className="min-h-[44px] max-h-32 resize-none"
-            rows={1}
+        <div className="shrink-0 border-t border-border p-4">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            className="hidden"
           />
-          <Button
-            onClick={handleSend}
-            disabled={(!input.trim() && !pendingImage) || isLoading || isUploading}
-            className="gradient-primary shrink-0"
-            size="icon"
-          >
-            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
+          <div className="flex items-end gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              className="shrink-0"
+              title="Upload photo"
+            >
+              <ImagePlus className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={isRecording ? "destructive" : "outline"}
+              size="icon"
+              onClick={toggleRecording}
+              className="shrink-0"
+            >
+              {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+            <Textarea
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={examMode ? "Ask for revision notes, formulas, or practice questions..." : "Ask anything about your studies..."}
+              className="min-h-[44px] max-h-32 resize-none"
+              rows={1}
+            />
+            <Button
+              onClick={handleSend}
+              disabled={(!input.trim() && !pendingImage) || isLoading || isUploading || isInitializing}
+              className="gradient-primary shrink-0"
+              size="icon"
+            >
+              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
