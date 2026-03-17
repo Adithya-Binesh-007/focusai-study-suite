@@ -75,7 +75,7 @@ npm run dev
 ## Usage
 
 ### For Students
-1. **Sign up** with your email
+1. **Sign up** with your username and password
 2. **Explore the Dashboard** to see your daily tasks and progress
 3. **Use the AI Assistant** to ask questions or upload study materials
 4. **Complete Daily Tasks** to earn credits
