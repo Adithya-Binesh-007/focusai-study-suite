@@ -6,9 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2 as TesseractLoader } from "lucide-react";
-import Tesseract from "tesseract.js";
-import * as pdfjsLib from "pdfjs-dist";
 import {
   Mic,
   MicOff,
@@ -27,6 +24,8 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+import Tesseract from "tesseract.js";
+import * as pdfjsLib from "pdfjs-dist";
 import jsPDF from "jspdf";
 
 const formatConversationTime = (value: string) => {
