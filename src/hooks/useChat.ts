@@ -183,6 +183,7 @@ export function useChat() {
 
   const selectConversation = useCallback(
     async (conversationId: string) => {
+      setMessages([]);
       setActiveConversationId(conversationId);
       await loadConversation(conversationId);
     },
@@ -356,6 +357,10 @@ export function useChat() {
     const nextConversationId = crypto.randomUUID();
     setActiveConversationId(nextConversationId);
     setMessages([]);
+    setConversations((prev) => {
+      const filtered = prev.filter((c) => c.id !== nextConversationId);
+      return filtered;
+    });
   }, []);
 
   return {

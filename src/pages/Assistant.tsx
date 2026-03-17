@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
+import { Loader2 as TesseractLoader } from "lucide-react";
+import Tesseract from "tesseract.js";
+import * as pdfjsLib from "pdfjs-dist";
 import {
   Mic,
   MicOff,
@@ -17,6 +20,8 @@ import {
   ImagePlus,
   MessageSquarePlus,
   MessagesSquare,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -54,6 +59,8 @@ export default function Assistant() {
   const [pendingImage, setPendingImage] = useState<{ file: File; preview: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [examModeTracked, setExamModeTracked] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [extractedText, setExtractedText] = useState<string>("");
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,18 +85,56 @@ export default function Assistant() {
     if ((!input.trim() && !pendingImage) || isLoading || isInitializing) return;
 
     let imageUrl: string | undefined;
+    let ocrText = "";
+
     if (pendingImage) {
       setIsUploading(true);
       const url = await uploadImage(pendingImage.file);
       setIsUploading(false);
       if (!url) return;
       imageUrl = url;
+
+      // Extract text from image or PDF
+      const isImage = pendingImage.file.type.startsWith("image/");
+      const isPdf = pendingImage.file.type === "application/pdf";
+
+      if (isImage) {
+        try {
+          const result = await Tesseract.recognize(pendingImage.file, "eng");
+          ocrText = result.data.text;
+          setExtractedText(ocrText);
+        } catch (error) {
+          console.error("OCR error:", error);
+        }
+      } else if (isPdf) {
+        try {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+          const arrayBuffer = await pendingImage.file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+          let pdfText = "";
+
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map((item: any) => item.str).join(" ");
+            pdfText += pageText + "\n";
+          }
+
+          ocrText = pdfText;
+          setExtractedText(ocrText);
+        } catch (error) {
+          console.error("PDF extraction error:", error);
+        }
+      }
+
       setPendingImage(null);
       incrementProgress("photo_upload");
     }
 
-    await sendMessage(input, examMode, imageUrl);
+    const messageContent = ocrText ? `${input}\n\n[Extracted Text from Document]\n${ocrText}` : input;
+    await sendMessage(messageContent, examMode, imageUrl);
     setInput("");
+    setExtractedText("");
     incrementProgress("ai_questions");
   };
 
@@ -100,12 +145,25 @@ export default function Assistant() {
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
 
-    const preview = URL.createObjectURL(file);
-    setPendingImage({ file, preview });
+    const isImage = file.type.startsWith("image/");
+    const isPdf = file.type === "application/pdf";
+
+    if (!isImage && !isPdf) return;
+
+    if (isImage) {
+      const preview = URL.createObjectURL(file);
+      setPendingImage({ file, preview });
+    } else if (isPdf) {
+      setIsUploading(true);
+      const preview = URL.createObjectURL(file);
+      setPendingImage({ file, preview });
+      setIsUploading(false);
+    }
+
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -147,8 +205,8 @@ export default function Assistant() {
   };
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[18rem_minmax(0,1fr)]">
-      <aside className="hidden min-h-0 border-r border-border bg-card/40 md:flex md:flex-col">
+    <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[18rem_minmax(0,1fr)]" style={!sidebarOpen ? { gridTemplateColumns: "1fr" } : {}}>
+      <aside className={`min-h-0 border-r border-border bg-card/40 md:flex md:flex-col ${sidebarOpen ? "" : "hidden"}`}>
         <div className="border-b border-border p-4">
           <Button variant="outline" className="w-full justify-start" onClick={handleNewConversation}>
             <MessageSquarePlus className="h-4 w-4" />
@@ -209,6 +267,15 @@ export default function Assistant() {
               <Button variant="outline" size="sm" className="md:hidden" onClick={handleNewConversation}>
                 <MessageSquarePlus className="h-4 w-4" />
                 New
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon"
+                className="hidden md:flex"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                title={sidebarOpen ? "Minimize chat" : "Show chat"}
+              >
+                {sidebarOpen ? <ChevronsLeft className="h-4 w-4" /> : <ChevronsRight className="h-4 w-4" />}
               </Button>
               <div className="flex items-center gap-2">
                 <GraduationCap className="h-4 w-4 text-muted-foreground" />
@@ -338,7 +405,7 @@ export default function Assistant() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.pdf"
             onChange={handleFileSelect}
             className="hidden"
           />
