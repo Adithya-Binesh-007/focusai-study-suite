@@ -120,9 +120,9 @@ For support, please open an issue on the GitHub repository or contact the develo
 
 This project is open source and available under the MIT License.
 
-## Developers
+## Developer
 
-Created by a team of passionate developers dedicated to enhancing student productivity through AI.
+Developed by Adithya Binesh part of HexnicAI.
 
 ---
 
