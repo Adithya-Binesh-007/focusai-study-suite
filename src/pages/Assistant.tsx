@@ -19,6 +19,9 @@ import {
   MessagesSquare,
   ChevronsLeft,
   ChevronsRight,
+  Minimize2,
+  Maximize2,
+  FileText,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -32,7 +35,6 @@ const formatConversationTime = (value: string) => {
   const date = new Date(value);
   const now = new Date();
   const sameDay = date.toDateString() === now.toDateString();
-
   return sameDay
     ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date)
     : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
@@ -55,11 +57,11 @@ export default function Assistant() {
   const [input, setInput] = useState("");
   const [examMode, setExamMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [pendingImage, setPendingImage] = useState<{ file: File; preview: string } | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ file: File; preview: string; type: "image" | "pdf" } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [examModeTracked, setExamModeTracked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [extractedText, setExtractedText] = useState<string>("");
+  const [chatMinimized, setChatMinimized] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -67,7 +69,6 @@ export default function Assistant() {
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
-
     requestAnimationFrame(() => {
       container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
     });
@@ -81,59 +82,52 @@ export default function Assistant() {
   }, [examMode, examModeTracked, incrementProgress]);
 
   const handleSend = async () => {
-    if ((!input.trim() && !pendingImage) || isLoading || isInitializing) return;
+    if ((!input.trim() && !pendingFile) || isLoading || isInitializing) return;
 
     let imageUrl: string | undefined;
     let ocrText = "";
 
-    if (pendingImage) {
+    if (pendingFile) {
       setIsUploading(true);
-      const url = await uploadImage(pendingImage.file);
+      const url = await uploadImage(pendingFile.file);
       setIsUploading(false);
       if (!url) return;
       imageUrl = url;
 
-      // Extract text from image or PDF
-      const isImage = pendingImage.file.type.startsWith("image/");
-      const isPdf = pendingImage.file.type === "application/pdf";
-
-      if (isImage) {
+      if (pendingFile.type === "image") {
         try {
-          const result = await Tesseract.recognize(pendingImage.file, "eng");
+          const result = await Tesseract.recognize(pendingFile.file, "eng");
           ocrText = result.data.text;
-          setExtractedText(ocrText);
         } catch (error) {
           console.error("OCR error:", error);
         }
-      } else if (isPdf) {
+      } else if (pendingFile.type === "pdf") {
         try {
           pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-          const arrayBuffer = await pendingImage.file.arrayBuffer();
+          const arrayBuffer = await pendingFile.file.arrayBuffer();
           const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
           let pdfText = "";
-
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             const pageText = textContent.items.map((item: any) => item.str).join(" ");
             pdfText += pageText + "\n";
           }
-
           ocrText = pdfText;
-          setExtractedText(ocrText);
         } catch (error) {
           console.error("PDF extraction error:", error);
         }
       }
 
-      setPendingImage(null);
+      setPendingFile(null);
       incrementProgress("photo_upload");
     }
 
-    const messageContent = ocrText ? `${input}\n\n[Extracted Text from Document]\n${ocrText}` : input;
+    const messageContent = ocrText
+      ? `${input}\n\n[Extracted Text from Document]\n${ocrText}`
+      : input;
     await sendMessage(messageContent, examMode, imageUrl);
     setInput("");
-    setExtractedText("");
     incrementProgress("ai_questions");
   };
 
@@ -150,18 +144,10 @@ export default function Assistant() {
 
     const isImage = file.type.startsWith("image/");
     const isPdf = file.type === "application/pdf";
-
     if (!isImage && !isPdf) return;
 
-    if (isImage) {
-      const preview = URL.createObjectURL(file);
-      setPendingImage({ file, preview });
-    } else if (isPdf) {
-      setIsUploading(true);
-      const preview = URL.createObjectURL(file);
-      setPendingImage({ file, preview });
-      setIsUploading(false);
-    }
+    const preview = URL.createObjectURL(file);
+    setPendingFile({ file, preview, type: isImage ? "image" : "pdf" });
 
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -203,8 +189,27 @@ export default function Assistant() {
     incrementProgress("pdf_download");
   };
 
+  if (chatMinimized) {
+    return (
+      <div className="flex h-full items-end justify-end p-6">
+        <Button
+          onClick={() => setChatMinimized(false)}
+          className="gradient-primary rounded-full shadow-lg"
+          size="lg"
+        >
+          <Maximize2 className="mr-2 h-4 w-4" />
+          Open Chat
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[18rem_minmax(0,1fr)]" style={!sidebarOpen ? { gridTemplateColumns: "1fr" } : {}}>
+    <div
+      className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[18rem_minmax(0,1fr)]"
+      style={!sidebarOpen ? { gridTemplateColumns: "1fr" } : {}}
+    >
+      {/* Sidebar */}
       <aside className={`min-h-0 border-r border-border bg-card/40 md:flex md:flex-col ${sidebarOpen ? "" : "hidden"}`}>
         <div className="border-b border-border p-4">
           <Button variant="outline" className="w-full justify-start" onClick={handleNewConversation}>
@@ -212,7 +217,6 @@ export default function Assistant() {
             New chat
           </Button>
         </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           <div className="space-y-1">
             {conversations.length === 0 ? (
@@ -247,7 +251,9 @@ export default function Assistant() {
         </div>
       </aside>
 
+      {/* Main chat area */}
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+        {/* Header */}
         <div className="shrink-0 border-b border-border p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -261,20 +267,27 @@ export default function Assistant() {
                 </p>
               </div>
             </div>
-
             <div className="flex items-center gap-2 md:gap-4">
               <Button variant="outline" size="sm" className="md:hidden" onClick={handleNewConversation}>
                 <MessageSquarePlus className="h-4 w-4" />
                 New
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="icon"
                 className="hidden md:flex"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                title={sidebarOpen ? "Minimize chat" : "Show chat"}
+                title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
               >
                 {sidebarOpen ? <ChevronsLeft className="h-4 w-4" /> : <ChevronsRight className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setChatMinimized(true)}
+                title="Minimize chat"
+              >
+                <Minimize2 className="h-4 w-4" />
               </Button>
               <div className="flex items-center gap-2">
                 <GraduationCap className="h-4 w-4 text-muted-foreground" />
@@ -285,6 +298,7 @@ export default function Assistant() {
           </div>
         </div>
 
+        {/* Mobile conversation chips */}
         <div className="shrink-0 border-b border-border p-2 md:hidden">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {conversations.length === 0 ? (
@@ -310,6 +324,7 @@ export default function Assistant() {
           </div>
         </div>
 
+        {/* Messages */}
         <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto p-4">
           {isInitializing ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -323,8 +338,8 @@ export default function Assistant() {
               <h2 className="mb-2 text-xl font-semibold">How can I help you study?</h2>
               <p className="max-w-md text-sm text-muted-foreground">
                 {examMode
-                  ? "Exam Mode is ON — I’ll focus on quick revision, formulas, and practice questions."
-                  : "Ask me anything! I can generate notes, explain concepts, solve problems, and more. Upload photos of your notes too!"}
+                  ? "Exam Mode is ON — I'll focus on quick revision, formulas, and practice questions."
+                  : "Ask me anything! I can generate notes, explain concepts, solve problems, and more. Upload photos or PDFs of your notes too!"}
               </p>
               <div className="mt-6 flex max-w-lg flex-wrap justify-center gap-2">
                 {["Explain quantum physics", "Generate study notes for biology", "Create practice questions for math"].map((question) => (
@@ -386,12 +401,23 @@ export default function Assistant() {
           )}
         </div>
 
-        {pendingImage && (
+        {/* Pending file preview */}
+        {pendingFile && (
           <div className="shrink-0 px-4 pb-2">
             <div className="relative inline-block">
-              <img src={pendingImage.preview} alt="Selected upload preview" className="h-20 rounded-lg border border-border" />
+              {pendingFile.type === "image" ? (
+                <img src={pendingFile.preview} alt="Selected upload preview" className="h-20 rounded-lg border border-border" />
+              ) : (
+                <div className="flex h-20 items-center gap-2 rounded-lg border border-border bg-muted px-4">
+                  <FileText className="h-8 w-8 text-primary" />
+                  <div className="max-w-[120px]">
+                    <p className="truncate text-xs font-medium">{pendingFile.file.name}</p>
+                    <p className="text-[10px] text-muted-foreground">PDF Document</p>
+                  </div>
+                </div>
+              )}
               <button
-                onClick={() => setPendingImage(null)}
+                onClick={() => setPendingFile(null)}
                 className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground"
               >
                 ×
@@ -400,6 +426,7 @@ export default function Assistant() {
           </div>
         )}
 
+        {/* Input area */}
         <div className="shrink-0 border-t border-border p-4">
           <input
             ref={fileInputRef}
@@ -414,7 +441,7 @@ export default function Assistant() {
               size="icon"
               onClick={() => fileInputRef.current?.click()}
               className="shrink-0"
-              title="Upload photo"
+              title="Upload photo or PDF"
             >
               <ImagePlus className="h-4 w-4" />
             </Button>
@@ -436,7 +463,7 @@ export default function Assistant() {
             />
             <Button
               onClick={handleSend}
-              disabled={(!input.trim() && !pendingImage) || isLoading || isUploading || isInitializing}
+              disabled={(!input.trim() && !pendingFile) || isLoading || isUploading || isInitializing}
               className="gradient-primary shrink-0"
               size="icon"
             >

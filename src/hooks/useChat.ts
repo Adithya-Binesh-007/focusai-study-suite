@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -31,16 +31,9 @@ const trimText = (value: string, maxLength: number) => {
 
 const parseStoredMessage = (content: string) => {
   const match = content.match(IMAGE_PREFIX_REGEX);
-
-  if (!match) {
-    return { content, imageUrl: undefined as string | undefined };
-  }
-
+  if (!match) return { content, imageUrl: undefined as string | undefined };
   const cleanContent = content.replace(IMAGE_PREFIX_REGEX, "").trimStart();
-  return {
-    content: cleanContent || "Photo upload",
-    imageUrl: match[1],
-  };
+  return { content: cleanContent || "Photo upload", imageUrl: match[1] };
 };
 
 const buildConversationSummaries = (
@@ -65,7 +58,6 @@ const buildConversationSummaries = (
 
     const existing = summaries.get(row.conversation_id)!;
     existing.messageCount += 1;
-
     if (row.role === "user") {
       existing.title = trimText(text, 36);
     }
@@ -84,11 +76,16 @@ export function useChat() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const activeIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync
+  useEffect(() => {
+    activeIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   const loadConversation = useCallback(
     async (conversationId: string) => {
       if (!user) return;
-
       const { data, error } = await supabase
         .from("chat_messages")
         .select("*")
@@ -116,10 +113,9 @@ export function useChat() {
     [user],
   );
 
-  const refreshConversations = useCallback(
-    async (nextActiveConversationId?: string | null) => {
-      if (!user) return [] as ConversationSummary[];
-
+  const fetchConversations = useCallback(
+    async () => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from("chat_messages")
         .select("conversation_id, role, content, created_at")
@@ -128,22 +124,17 @@ export function useChat() {
 
       if (error) {
         toast({ title: "Error", description: "Failed to load conversations", variant: "destructive" });
-        return [] as ConversationSummary[];
+        return [];
       }
 
-      const nextConversations = buildConversationSummaries(data ?? []);
-      setConversations(nextConversations);
-
-      const nextId = nextActiveConversationId ?? activeConversationId;
-      if (nextId && !nextConversations.some((conversation) => conversation.id === nextId)) {
-        setActiveConversationId(nextConversations[0]?.id ?? crypto.randomUUID());
-      }
-
-      return nextConversations;
+      const result = buildConversationSummaries(data ?? []);
+      setConversations(result);
+      return result;
     },
-    [user, activeConversationId],
+    [user],
   );
 
+  // Initialize on user change
   useEffect(() => {
     if (!user) {
       setMessages([]);
@@ -157,34 +148,30 @@ export function useChat() {
 
     const initialize = async () => {
       setIsInitializing(true);
-      const nextConversations = await refreshConversations();
+      const convos = await fetchConversations();
       if (cancelled) return;
 
-      if (nextConversations.length > 0) {
-        const latestConversationId = nextConversations[0].id;
-        setActiveConversationId(latestConversationId);
-        await loadConversation(latestConversationId);
+      if (convos.length > 0) {
+        const latestId = convos[0].id;
+        setActiveConversationId(latestId);
+        await loadConversation(latestId);
       } else {
         setActiveConversationId(crypto.randomUUID());
         setMessages([]);
       }
 
-      if (!cancelled) {
-        setIsInitializing(false);
-      }
+      if (!cancelled) setIsInitializing(false);
     };
 
     initialize();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user, refreshConversations, loadConversation]);
+    return () => { cancelled = true; };
+  }, [user, fetchConversations, loadConversation]);
 
   const selectConversation = useCallback(
     async (conversationId: string) => {
-      setMessages([]);
+      if (conversationId === activeIdRef.current) return;
       setActiveConversationId(conversationId);
+      setMessages([]);
       await loadConversation(conversationId);
     },
     [loadConversation],
@@ -231,8 +218,9 @@ export function useChat() {
 
   const sendMessage = useCallback(
     async (input: string, examMode = false, imageUrl?: string) => {
-      if (!user || (!input.trim() && !imageUrl) || !activeConversationId) return;
+      if (!user || (!input.trim() && !imageUrl) || !activeIdRef.current) return;
 
+      const conversationId = activeIdRef.current;
       const userMessage: ChatMessage = {
         role: "user",
         content: input.trim() || "Photo upload",
@@ -245,12 +233,12 @@ export function useChat() {
 
       await supabase.from("chat_messages").insert({
         user_id: user.id,
-        conversation_id: activeConversationId,
+        conversation_id: conversationId,
         role: "user",
         content: imageUrl ? `[Image: ${imageUrl}]\n${input}` : input,
       });
 
-      await refreshConversations(activeConversationId);
+      await fetchConversations();
 
       let assistantSoFar = "";
       const upsertAssistant = (chunk: string) => {
@@ -262,7 +250,6 @@ export function useChat() {
               index === currentMessages.length - 1 ? { ...message, content: assistantSoFar } : message,
             );
           }
-
           return [...currentMessages, { role: "assistant", content: assistantSoFar }];
         });
       };
@@ -294,9 +281,7 @@ export function useChat() {
           return;
         }
 
-        if (!response.ok || !response.body) {
-          throw new Error("Failed to start stream");
-        }
+        if (!response.ok || !response.body) throw new Error("Failed to start stream");
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -317,10 +302,7 @@ export function useChat() {
             if (!line.startsWith("data: ")) continue;
 
             const jsonStr = line.slice(6).trim();
-            if (jsonStr === "[DONE]") {
-              streamDone = true;
-              break;
-            }
+            if (jsonStr === "[DONE]") { streamDone = true; break; }
 
             try {
               const parsed = JSON.parse(jsonStr);
@@ -336,13 +318,13 @@ export function useChat() {
         if (assistantSoFar) {
           await supabase.from("chat_messages").insert({
             user_id: user.id,
-            conversation_id: activeConversationId,
+            conversation_id: conversationId,
             role: "assistant",
             content: assistantSoFar,
           });
         }
 
-        await refreshConversations(activeConversationId);
+        await fetchConversations();
       } catch (error) {
         console.error("Chat error:", error);
         toast({ title: "Error", description: "Failed to get AI response", variant: "destructive" });
@@ -350,17 +332,14 @@ export function useChat() {
         setIsLoading(false);
       }
     },
-    [user, activeConversationId, messages, queryClient, refreshConversations],
+    [user, messages, queryClient, fetchConversations],
   );
 
   const clearChat = useCallback(() => {
-    const nextConversationId = crypto.randomUUID();
-    setActiveConversationId(nextConversationId);
+    const newId = crypto.randomUUID();
+    setActiveConversationId(newId);
+    activeIdRef.current = newId;
     setMessages([]);
-    setConversations((prev) => {
-      const filtered = prev.filter((c) => c.id !== nextConversationId);
-      return filtered;
-    });
   }, []);
 
   return {

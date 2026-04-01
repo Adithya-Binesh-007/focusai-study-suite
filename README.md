@@ -8,9 +8,12 @@ FocusAI is an intelligent study companion platform designed for students to enha
 - Voice and text-powered AI that generates comprehensive study notes
 - Explain complex concepts in simple terms
 - Solve problems step-by-step
-- Upload photos of your notes and get instant analysis
-- Support for PDF documents
+- Upload photos of your notes and get instant OCR-powered analysis
+- Support for PDF document uploads and text extraction
 - Exam Mode for quick revision and practice questions
+- Conversation history with sidebar navigation
+- Minimize chat toggle for distraction-free browsing
+- Download AI responses as PDF
 
 ### ✅ Smart Tasks
 - 10 daily study tasks to keep you productive
@@ -28,17 +31,6 @@ FocusAI is an intelligent study companion platform designed for students to enha
 - Track productivity metrics
 - View weekly progress reports
 - Analyze your learning patterns
-
-## Technology Stack
-
-- **Frontend**: React, TypeScript, Vite
-- **UI Components**: shadcn/ui with Tailwind CSS
-- **State Management**: React Query (@tanstack/react-query)
-- **Database**: Supabase (PostgreSQL)
-- **Auth**: Supabase Authentication
-- **OCR**: Tesseract.js for image text extraction
-- **PDF Processing**: pdfjs-dist for document analysis
-- **Animations**: Framer Motion
 
 ## Getting Started
 
@@ -59,10 +51,10 @@ npm install
 ```
 
 3. Set up environment variables:
-Create a `.env.local` file with your Supabase credentials:
+Create a `.env.local` file with your database credentials:
 ```
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_key
+VITE_SUPABASE_URL=your_backend_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_backend_key
 ```
 
 4. Start the development server:
@@ -84,9 +76,21 @@ npm run dev
 ### AI Assistant Features
 - **Text Input**: Ask any study-related question
 - **Voice Input**: Use speech recognition (English language)
-- **Photo Upload**: Capture and analyze textbook pages or handwritten notes
-- **PDF Support**: Upload entire study documents for analysis
+- **Photo Upload**: Capture and analyze textbook pages or handwritten notes with OCR
+- **PDF Support**: Upload entire study documents for text extraction and analysis
 - **Exam Mode**: Toggle for quick revision-focused responses
+- **Chat History**: Switch between past conversations via sidebar
+- **Minimize**: Collapse chat to focus on other tasks
+
+## Technology Stack
+
+- **Frontend**: React, TypeScript, Vite
+- **UI Components**: shadcn/ui with Tailwind CSS
+- **State Management**: React Query
+- **Database**: PostgreSQL
+- **OCR**: Tesseract.js for image text extraction
+- **PDF Processing**: pdfjs-dist for document analysis
+- **Animations**: Framer Motion
 
 ## Building for Production
 
@@ -112,17 +116,13 @@ src/
 
 Contributions are welcome! Please feel free to submit pull requests or open issues.
 
-## Support
-
-For support, please open an issue on the GitHub repository or contact the development team.
-
 ## License
 
 This project is open source and available under the MIT License.
 
 ## Developer
 
-Developed by Adithya Binesh part of HexnicAI.
+Developed by Adithya Binesh, part of HexnicAI.
 
 ---
 
