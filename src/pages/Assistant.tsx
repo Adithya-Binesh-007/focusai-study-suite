@@ -84,27 +84,34 @@ export default function Assistant() {
   const handleSend = async () => {
     if ((!input.trim() && !pendingFile) || isLoading || isInitializing) return;
 
+    const currentInput = input;
+    const currentFile = pendingFile;
+    
+    // Clear input immediately (like ChatGPT)
+    setInput("");
+    setPendingFile(null);
+
     let imageUrl: string | undefined;
     let ocrText = "";
 
-    if (pendingFile) {
+    if (currentFile) {
       setIsUploading(true);
-      const url = await uploadImage(pendingFile.file);
+      const url = await uploadImage(currentFile.file);
       setIsUploading(false);
       if (!url) return;
       imageUrl = url;
 
-      if (pendingFile.type === "image") {
+      if (currentFile.type === "image") {
         try {
-          const result = await Tesseract.recognize(pendingFile.file, "eng");
+          const result = await Tesseract.recognize(currentFile.file, "eng");
           ocrText = result.data.text;
         } catch (error) {
           console.error("OCR error:", error);
         }
-      } else if (pendingFile.type === "pdf") {
+      } else if (currentFile.type === "pdf") {
         try {
           pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-          const arrayBuffer = await pendingFile.file.arrayBuffer();
+          const arrayBuffer = await currentFile.file.arrayBuffer();
           const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
           let pdfText = "";
           for (let i = 1; i <= pdf.numPages; i++) {
@@ -119,15 +126,13 @@ export default function Assistant() {
         }
       }
 
-      setPendingFile(null);
       incrementProgress("photo_upload");
     }
 
     const messageContent = ocrText
-      ? `${input}\n\n[Extracted Text from Document]\n${ocrText}`
-      : input;
+      ? `${currentInput}\n\n[Extracted Text from Document]\n${ocrText}`
+      : currentInput;
     await sendMessage(messageContent, examMode, imageUrl);
-    setInput("");
     incrementProgress("ai_questions");
   };
 
