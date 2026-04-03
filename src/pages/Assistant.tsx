@@ -110,19 +110,37 @@ export default function Assistant() {
         }
       } else if (currentFile.type === "pdf") {
         try {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+          pdfjsLib.GlobalWorkerOptions.workerSrc = "";
           const arrayBuffer = await currentFile.file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
+          const pdf = await loadingTask.promise;
           let pdfText = "";
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            const pageText = textContent.items.map((item: any) => item.str).join(" ");
-            pdfText += pageText + "\n";
+            const items = textContent.items as any[];
+            let lastY: number | null = null;
+            const lines: string[] = [];
+            let currentLine = "";
+            for (const item of items) {
+              if (lastY !== null && Math.abs(item.transform[5] - lastY) > 2) {
+                lines.push(currentLine);
+                currentLine = "";
+              }
+              currentLine += item.str;
+              lastY = item.transform[5];
+            }
+            if (currentLine) lines.push(currentLine);
+            pdfText += lines.join("\n") + "\n\n";
           }
-          ocrText = pdfText;
+          ocrText = pdfText.trim();
+          if (!ocrText || ocrText.length < 30) {
+            // Fallback: OCR the first page image if text extraction yielded little
+            ocrText = "[PDF uploaded but text extraction was limited. The content may be scanned/image-based.]";
+          }
         } catch (error) {
           console.error("PDF extraction error:", error);
+          ocrText = "[PDF uploaded but could not extract text. Please describe the content.]";
         }
       }
 
