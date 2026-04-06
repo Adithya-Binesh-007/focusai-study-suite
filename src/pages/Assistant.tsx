@@ -340,7 +340,13 @@ export default function Assistant() {
                   : "Ask me anything! I can generate notes, explain concepts, solve problems, and more. Upload photos or PDFs of your notes too!"}
               </p>
               <div className="mt-6 flex max-w-lg flex-wrap justify-center gap-2">
-                {["Explain quantum physics", "Generate study notes for biology", "Create practice questions for math"].map((question) => (
+                {[
+                  "Write a 9-mark answer on Newton's Laws of Motion",
+                  "Prepare a 9-mark response on photosynthesis",
+                  "Generate a 9-mark essay plan for World War II causes",
+                  "Explain the structure of the atom (9-mark style)",
+                  "Create practice questions for math",
+                ].map((question) => (
                   <button
                     key={question}
                     onClick={() => setInput(question)}

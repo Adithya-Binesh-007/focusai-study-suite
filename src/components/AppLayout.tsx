@@ -1,6 +1,7 @@
 import { ReactNode, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { useStreakTracker } from "@/hooks/useStreakTracker";
 import {
   Sidebar,
   SidebarContent,
@@ -95,6 +96,7 @@ function AppSidebarContent() {
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
+  useStreakTracker();
 
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
