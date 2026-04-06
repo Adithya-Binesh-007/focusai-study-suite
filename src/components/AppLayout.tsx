@@ -96,6 +96,7 @@ function AppSidebarContent() {
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
+  useStreakTracker();
 
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
