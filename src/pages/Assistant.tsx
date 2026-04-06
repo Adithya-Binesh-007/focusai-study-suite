@@ -27,9 +27,9 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import Tesseract from "tesseract.js";
-import * as pdfjsLib from "pdfjs-dist";
 import jsPDF from "jspdf";
+import { extractTextFromFile } from "@/lib/documentExtraction";
+import { isPdfAttachmentUrl, type AttachmentType } from "@/lib/chatAttachments";
 
 const formatConversationTime = (value: string) => {
   const date = new Date(value);
@@ -57,7 +57,7 @@ export default function Assistant() {
   const [input, setInput] = useState("");
   const [examMode, setExamMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [pendingFile, setPendingFile] = useState<{ file: File; preview: string; type: "image" | "pdf" } | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ file: File; preview: string; type: AttachmentType } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [examModeTracked, setExamModeTracked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -91,66 +91,41 @@ export default function Assistant() {
     setInput("");
     setPendingFile(null);
 
-    let imageUrl: string | undefined;
-    let ocrText = "";
+    let attachment: { url: string; type: AttachmentType; extractedText?: string } | undefined;
 
     if (currentFile) {
       setIsUploading(true);
       const url = await uploadImage(currentFile.file);
-      setIsUploading(false);
-      if (!url) return;
-      imageUrl = url;
+      if (!url) {
+        setIsUploading(false);
+        return;
+      }
 
-      if (currentFile.type === "image") {
-        try {
-          const result = await Tesseract.recognize(currentFile.file, "eng");
-          ocrText = result.data.text;
-        } catch (error) {
-          console.error("OCR error:", error);
-        }
-      } else if (currentFile.type === "pdf") {
-        try {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-          const arrayBuffer = await currentFile.file.arrayBuffer();
-          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
-          const pdf = await loadingTask.promise;
-          let pdfText = "";
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            const items = textContent.items as any[];
-            let lastY: number | null = null;
-            const lines: string[] = [];
-            let currentLine = "";
-            for (const item of items) {
-              if (lastY !== null && Math.abs(item.transform[5] - lastY) > 2) {
-                lines.push(currentLine);
-                currentLine = "";
-              }
-              currentLine += item.str;
-              lastY = item.transform[5];
-            }
-            if (currentLine) lines.push(currentLine);
-            pdfText += lines.join("\n") + "\n\n";
-          }
-          ocrText = pdfText.trim();
-          if (!ocrText || ocrText.length < 30) {
-            // Fallback: OCR the first page image if text extraction yielded little
-            ocrText = "[PDF uploaded but text extraction was limited. The content may be scanned/image-based.]";
-          }
-        } catch (error) {
-          console.error("PDF extraction error:", error);
-          ocrText = "[PDF uploaded but could not extract text. Please describe the content.]";
-        }
+      try {
+        const extractedText = await extractTextFromFile(currentFile.file, currentFile.type);
+        attachment = {
+          url,
+          type: currentFile.type,
+          extractedText,
+        };
+      } catch (error) {
+        console.error("Document extraction error:", error);
+        attachment = {
+          url,
+          type: currentFile.type,
+          extractedText:
+            currentFile.type === "pdf"
+              ? "The uploaded PDF could not be read clearly. Do not answer from earlier conversation context. Ask the user to upload a clearer PDF or paste the question text."
+              : undefined,
+        };
+      } finally {
+        setIsUploading(false);
       }
 
       incrementProgress("photo_upload");
     }
 
-    const messageContent = ocrText
-      ? `${currentInput}\n\n[Extracted Text from Document]\n${ocrText}`
-      : currentInput;
-    await sendMessage(messageContent, examMode, imageUrl);
+    await sendMessage(currentInput, examMode, attachment);
     incrementProgress("ai_questions");
   };
 
@@ -391,8 +366,8 @@ export default function Assistant() {
                         message.role === "user" ? "gradient-primary text-primary-foreground" : "bg-muted"
                       }`}
                     >
-                      {message.imageUrl && (
-                        message.imageUrl.match(/\.pdf$/i) ? (
+                        {message.imageUrl && (
+                        message.attachmentType === "pdf" || isPdfAttachmentUrl(message.imageUrl) ? (
                           <div className="mb-2 flex items-center gap-2 rounded-lg border border-border/30 bg-background/20 px-3 py-2">
                             <FileText className="h-5 w-5" />
                             <span className="text-xs">PDF Document</span>
@@ -487,7 +462,7 @@ export default function Assistant() {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={examMode ? "Ask for revision notes, formulas, or practice questions..." : "Ask anything about your studies..."}
+              placeholder={examMode ? "Type something for revision, formulas, or practice questions..." : "Type something about your studies..."}
               className="min-h-[44px] max-h-32 resize-none"
               rows={1}
             />

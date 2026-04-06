@@ -4,12 +4,21 @@ import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
+import {
+  buildModelMessageContent,
+  encodeStoredMessage,
+  getAttachmentLabel,
+  parseStoredMessage,
+  type AttachmentType,
+} from "@/lib/chatAttachments";
 
 export interface ChatMessage {
   id?: string;
   role: "user" | "assistant";
   content: string;
   imageUrl?: string;
+  attachmentType?: AttachmentType;
+  contextText?: string;
 }
 
 export interface ConversationSummary {
@@ -22,18 +31,9 @@ export interface ConversationSummary {
 
 type ChatMessageRow = Tables<"chat_messages">;
 
-const IMAGE_PREFIX_REGEX = /^\[Image: (.+?)\]\n?/s;
-
 const trimText = (value: string, maxLength: number) => {
   if (value.length <= maxLength) return value;
   return `${value.slice(0, maxLength - 1).trimEnd()}…`;
-};
-
-const parseStoredMessage = (content: string) => {
-  const match = content.match(IMAGE_PREFIX_REGEX);
-  if (!match) return { content, imageUrl: undefined as string | undefined };
-  const cleanContent = content.replace(IMAGE_PREFIX_REGEX, "").trimStart();
-  return { content: cleanContent || "Photo upload", imageUrl: match[1] };
 };
 
 const buildConversationSummaries = (
@@ -43,7 +43,7 @@ const buildConversationSummaries = (
 
   rows.forEach((row) => {
     const parsed = parseStoredMessage(row.content);
-    const text = parsed.content || (parsed.imageUrl ? "Photo upload" : "Empty message");
+    const text = parsed.content || (parsed.imageUrl ? getAttachmentLabel(parsed.attachmentType) : "Empty message");
 
     if (!summaries.has(row.conversation_id)) {
       summaries.set(row.conversation_id, {
@@ -106,6 +106,8 @@ export function useChat() {
             role: message.role as "user" | "assistant",
             content: parsed.content,
             imageUrl: parsed.imageUrl,
+            attachmentType: parsed.attachmentType,
+            contextText: parsed.contextText,
           };
         }),
       );
@@ -217,14 +219,21 @@ export function useChat() {
   );
 
   const sendMessage = useCallback(
-    async (input: string, examMode = false, imageUrl?: string) => {
-      if (!user || (!input.trim() && !imageUrl) || !activeIdRef.current) return;
+    async (
+      input: string,
+      examMode = false,
+      attachment?: { url: string; type: AttachmentType; extractedText?: string },
+    ) => {
+      const trimmedInput = input.trim();
+      if (!user || (!trimmedInput && !attachment) || !activeIdRef.current) return;
 
       const conversationId = activeIdRef.current;
       const userMessage: ChatMessage = {
         role: "user",
-        content: input.trim() || "Photo upload",
-        imageUrl,
+        content: trimmedInput || getAttachmentLabel(attachment?.type),
+        imageUrl: attachment?.url,
+        attachmentType: attachment?.type,
+        contextText: attachment?.extractedText?.trim() || undefined,
       };
 
       const nextMessages = [...messages, userMessage];
@@ -235,7 +244,12 @@ export function useChat() {
         user_id: user.id,
         conversation_id: conversationId,
         role: "user",
-        content: imageUrl ? `[Image: ${imageUrl}]\n${input}` : input,
+        content: encodeStoredMessage({
+          content: userMessage.content,
+          attachmentUrl: attachment?.url,
+          attachmentType: attachment?.type,
+          contextText: attachment?.extractedText,
+        }),
       });
 
       await fetchConversations();
@@ -257,7 +271,7 @@ export function useChat() {
       try {
         const allMessages = nextMessages.map((message) => ({
           role: message.role,
-          content: message.imageUrl ? `[Image: ${message.imageUrl}]\n${message.content}` : message.content,
+          content: buildModelMessageContent(message),
         }));
 
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
@@ -332,7 +346,7 @@ export function useChat() {
         setIsLoading(false);
       }
     },
-    [user, messages, queryClient, fetchConversations],
+    [user, messages, fetchConversations],
   );
 
   const clearChat = useCallback(() => {
