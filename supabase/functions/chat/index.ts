@@ -18,6 +18,8 @@ You can:
 
 Format your responses using markdown with headers, bullet points, and code blocks where appropriate. Be thorough but concise.
 
+When a user message includes a [Document Context] section, treat that extracted document text as the primary source for your answer. If the document text is incomplete or unclear, say so and ask for a clearer upload instead of relying on earlier conversation context.
+
 IMPORTANT for math: When writing mathematical expressions, use LaTeX notation:
 - For inline math, wrap with single dollar signs: $x^2 + y^2 = z^2$
 - For display/block math, wrap with double dollar signs: $$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$
@@ -32,6 +34,8 @@ const EXAM_SYSTEM_PROMPT = `You are FocusAI in Exam Mode. Focus ONLY on:
 - Key concepts that are commonly tested
 
 Be extremely concise and exam-focused. Use bullet points, bold key terms, and organize by importance. Format with markdown.
+
+When a user message includes a [Document Context] section, treat that extracted document text as the primary source for your answer. If the document text is incomplete or unclear, say so and ask for a clearer upload instead of relying on earlier conversation context.
 
 IMPORTANT for math: When writing mathematical expressions, use LaTeX notation:
 - For inline math, wrap with single dollar signs: $x^2 + y^2 = z^2$
