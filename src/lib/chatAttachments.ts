@@ -85,9 +85,26 @@ export const parseStoredMessage = (storedContent: string) => {
 export const buildModelMessageContent = (message: {
   content: string;
   contextText?: string;
-}) => {
+  imageUrl?: string;
+  attachmentType?: AttachmentType;
+}): string | Array<{ type: string; text?: string; image_url?: { url: string } }> => {
   const visibleContent = message.content.trim();
   const documentContext = message.contextText?.trim();
+
+  // For image attachments, send the actual image to the multimodal model
+  // instead of relying on OCR text (which is poor for math/diagrams)
+  if (message.imageUrl && message.attachmentType === "image") {
+    const textParts = [visibleContent];
+    if (documentContext) {
+      textParts.push("[Document Context]", documentContext);
+    }
+    const combinedText = textParts.filter(Boolean).join("\n\n");
+
+    return [
+      { type: "text", text: combinedText || "Please analyze this image and answer any questions shown." },
+      { type: "image_url", image_url: { url: message.imageUrl } },
+    ];
+  }
 
   if (!documentContext) return visibleContent;
 
