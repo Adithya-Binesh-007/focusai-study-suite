@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
-import { Brain, LayoutDashboard, MessageSquare, ListTodo, Coins, BarChart3, LogOut, Moon, Sun } from "lucide-react";
+import { Brain, LayoutDashboard, MessageSquare, ListTodo, Coins, BarChart3, HelpCircle, LogOut, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { Skeleton } from "@/components/ui/skeleton";
 
