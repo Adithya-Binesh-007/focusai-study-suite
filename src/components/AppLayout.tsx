@@ -26,6 +26,7 @@ const navItems = [
   { title: "Tasks", url: "/tasks", icon: ListTodo },
   { title: "Credits", url: "/credits", icon: Coins },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Quiz", url: "/quiz", icon: HelpCircle },
 ];
 
 function AppSidebarContent() {

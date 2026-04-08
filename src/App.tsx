@@ -34,6 +34,7 @@ const App = () => (
               <Route path="/tasks" element={<AppLayout><Tasks /></AppLayout>} />
               <Route path="/credits" element={<AppLayout><Credits /></AppLayout>} />
               <Route path="/analytics" element={<AppLayout><Analytics /></AppLayout>} />
+              <Route path="/quiz" element={<AppLayout><Quiz /></AppLayout>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
