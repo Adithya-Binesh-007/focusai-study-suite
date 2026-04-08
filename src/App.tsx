@@ -13,6 +13,7 @@ import Assistant from "./pages/Assistant";
 import Tasks from "./pages/Tasks";
 import Credits from "./pages/Credits";
 import Analytics from "./pages/Analytics";
+import Quiz from "./pages/Quiz";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="/tasks" element={<AppLayout><Tasks /></AppLayout>} />
               <Route path="/credits" element={<AppLayout><Credits /></AppLayout>} />
               <Route path="/analytics" element={<AppLayout><Analytics /></AppLayout>} />
+              <Route path="/quiz" element={<AppLayout><Quiz /></AppLayout>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

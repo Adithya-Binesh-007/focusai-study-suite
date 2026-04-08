@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
-import { Brain, LayoutDashboard, MessageSquare, ListTodo, Coins, BarChart3, LogOut, Moon, Sun } from "lucide-react";
+import { Brain, LayoutDashboard, MessageSquare, ListTodo, Coins, BarChart3, HelpCircle, LogOut, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -26,6 +26,7 @@ const navItems = [
   { title: "Tasks", url: "/tasks", icon: ListTodo },
   { title: "Credits", url: "/credits", icon: Coins },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Quiz", url: "/quiz", icon: HelpCircle },
 ];
 
 function AppSidebarContent() {
