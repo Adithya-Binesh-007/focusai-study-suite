@@ -13,6 +13,7 @@ import Assistant from "./pages/Assistant";
 import Tasks from "./pages/Tasks";
 import Credits from "./pages/Credits";
 import Analytics from "./pages/Analytics";
+import Quiz from "./pages/Quiz";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
