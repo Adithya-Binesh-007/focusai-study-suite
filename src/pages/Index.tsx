@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Brain, CheckCircle, Coins, BarChart3, Sparkles, ArrowRight, ChevronDown, Github, Linkedin } from "lucide-react";
+import { Brain, CheckCircle, Coins, BarChart3, HelpCircle, Sparkles, ArrowRight, ChevronDown, Github, Linkedin } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useState } from "react";
 
@@ -10,6 +10,7 @@ const features = [
   { icon: CheckCircle, title: "Smart Tasks", desc: "10 daily study tasks with credits — stay productive and earn rewards" },
   { icon: Coins, title: "Credit System", desc: "Earn credits from tasks, unlock extra AI usage and premium features" },
   { icon: BarChart3, title: "Study Analytics", desc: "Track your study streaks, productivity, and weekly progress" },
+  { icon: HelpCircle, title: "Quiz Mode", desc: "Test your knowledge with AI-generated quizzes across all subjects and difficulty levels" },
 ];
 
 const developers = [
