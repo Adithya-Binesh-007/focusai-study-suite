@@ -84,6 +84,16 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
     const updated = [...answers];
     updated[current] = idx;
     setAnswers(updated);
+
+    // Auto-advance after a short delay to show feedback
+    setTimeout(() => {
+      if (current < questions.length - 1) {
+        setCurrent((c) => c + 1);
+        setSelected(null);
+      } else {
+        setPhase("review");
+      }
+    }, 1200);
   };
 
   const goNext = () => {
