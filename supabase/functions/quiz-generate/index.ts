@@ -24,9 +24,110 @@ const getDifficultyContext = (educationLevel: string, difficulty: string) => {
     return "board exam level questions including previous year board exam patterns";
   }
   if (difficulty === "easy") return "easy fundamental questions testing basic understanding";
-  if (difficulty === "medium") return "series/internal exam level questions with moderate complexity";
-  return "university exam level with application-based and analytical questions";
+  if (difficulty === "medium") return "series/internal exam level questions with moderate complexity, refer to KTU/university patterns";
+  return "university exam level with application-based and analytical questions, refer to KTU/university exam patterns";
 };
+
+async function generateBatch(
+  apiKey: string,
+  levelLabel: string,
+  subject: string,
+  difficulty: string,
+  context: string,
+  numQuestions: number,
+  educationLevel: string
+): Promise<any[]> {
+  const prompt = `Generate exactly ${numQuestions} multiple-choice quiz questions for:
+
+Level: ${levelLabel}
+Subject: ${subject}
+Difficulty: ${difficulty} — ${context}
+
+IMPORTANT RULES:
+- Questions must be appropriate for the exact class/year and subject specified
+- Each question must have exactly 4 options
+- Include a mix of topics from the subject syllabus for this specific level
+- For school: follow CBSE/ICSE/State board patterns
+- For class 11-12: follow board exam patterns for the specified stream
+- For B.Tech: follow KTU/university exam patterns, refer to standard textbooks and previous year papers
+- Provide a brief explanation for each correct answer`;
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert quiz generator for Indian education system (CBSE, ICSE, State boards, KTU, and universities). Generate accurate, syllabus-appropriate questions.",
+        },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 16000,
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "submit_quiz",
+            description: "Submit generated quiz questions",
+            parameters: {
+              type: "object",
+              properties: {
+                questions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      question: { type: "string" },
+                      options: {
+                        type: "array",
+                        items: { type: "string" },
+                        minItems: 4,
+                        maxItems: 4,
+                      },
+                      correctIndex: { type: "integer", minimum: 0, maximum: 3 },
+                      explanation: { type: "string" },
+                    },
+                    required: ["question", "options", "correctIndex", "explanation"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["questions"],
+              additionalProperties: false,
+            },
+          },
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "submit_quiz" } },
+    }),
+  });
+
+  if (!response.ok) {
+    const t = await response.text();
+    console.error("AI error:", response.status, t);
+    if (response.status === 429) {
+      throw new Error("Rate limited — please try again in a moment");
+    }
+    if (response.status === 402) {
+      throw new Error("AI credits exhausted — please add funds");
+    }
+    throw new Error("Failed to generate quiz questions");
+  }
+
+  const aiData = await response.json();
+  const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+  if (!toolCall?.function?.arguments) {
+    throw new Error("No structured response from AI");
+  }
+
+  const parsed = JSON.parse(toolCall.function.arguments);
+  return parsed.questions || [];
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -44,68 +145,30 @@ serve(async (req) => {
     else if (educationLevel === "higher_secondary") levelLabel = `Class ${classOrYear} (${stream} stream)`;
     else levelLabel = `B.Tech ${branch?.toUpperCase() || ""} Year ${classOrYear}`;
 
-    const prompt = `Generate exactly ${numQuestions} multiple-choice quiz questions for:
+    // For large question counts, split into batches to avoid truncation
+    let allQuestions: any[] = [];
 
-Level: ${levelLabel}
-Subject: ${subject}
-Difficulty: ${difficulty} — ${context}
+    if (numQuestions <= 15) {
+      allQuestions = await generateBatch(LOVABLE_API_KEY, levelLabel, subject, difficulty, context, numQuestions, educationLevel);
+    } else {
+      // Split into batches of ~12-13 questions
+      const batchSize = Math.ceil(numQuestions / Math.ceil(numQuestions / 13));
+      const batches = Math.ceil(numQuestions / batchSize);
 
-IMPORTANT RULES:
-- Questions must be appropriate for the exact class/year and subject specified
-- Each question must have exactly 4 options (A, B, C, D)
-- Include a mix of topics from the subject syllabus for this specific level
-- For school: follow CBSE/ICSE/State board patterns
-- For class 11-12: follow board exam patterns for the specified stream
-- For B.Tech: follow university exam patterns for the specified branch and year
-- Provide a brief explanation for each correct answer
+      for (let i = 0; i < batches; i++) {
+        const remaining = numQuestions - allQuestions.length;
+        const count = Math.min(batchSize, remaining);
+        const batchQuestions = await generateBatch(LOVABLE_API_KEY, levelLabel, subject, difficulty, context, count, educationLevel);
+        allQuestions.push(...batchQuestions);
+        if (allQuestions.length >= numQuestions) break;
+      }
 
-Respond ONLY with valid JSON in this exact format, no other text:
-{
-  "questions": [
-    {
-      "question": "The question text",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctIndex": 0,
-      "explanation": "Brief explanation of why this is correct"
-    }
-  ]
-}`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "You are an expert quiz generator for Indian education system (CBSE, ICSE, State boards, and universities). Generate accurate, syllabus-appropriate questions. Always respond with valid JSON only." },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const t = await response.text();
-      console.error("AI error:", response.status, t);
-      return new Response(JSON.stringify({ error: "Failed to generate quiz" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      allQuestions = allQuestions.slice(0, numQuestions);
     }
 
-    const aiData = await response.json();
-    const rawContent = aiData.choices?.[0]?.message?.content || "";
+    if (!allQuestions.length) throw new Error("No questions generated");
 
-    // Extract JSON from response (handle markdown code blocks)
-    let jsonStr = rawContent;
-    const codeBlockMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (codeBlockMatch) jsonStr = codeBlockMatch[1];
-
-    const parsed = JSON.parse(jsonStr.trim());
-
-    return new Response(JSON.stringify(parsed), {
+    return new Response(JSON.stringify({ questions: allQuestions }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
