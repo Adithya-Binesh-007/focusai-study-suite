@@ -131,22 +131,28 @@ export const getSubjects = (config: Partial<QuizConfig>): string[] => {
 };
 
 export const getDifficultyContext = (config: QuizConfig): string => {
-  const { educationLevel, difficulty } = config;
+  const { educationLevel, difficulty, classOrYear } = config;
 
   if (educationLevel === "school") {
+    const cls = parseInt(classOrYear || "1");
     if (difficulty === "easy") return "simple class test with basic recall questions";
     if (difficulty === "medium") return "mid-term exam (40-60 marks) with application-based questions";
-    return "annual/board exam level with analytical and higher-order thinking questions";
+    // Hard: only class 10 gets "board exam level", rest get "difficult level"
+    if (cls === 10) return "board exam level with analytical and higher-order thinking questions";
+    return "difficult level with analytical and higher-order thinking questions";
   }
 
   if (educationLevel === "higher_secondary") {
+    const cls = parseInt(classOrYear || "11");
     if (difficulty === "easy") return "simple class test with basic conceptual questions";
     if (difficulty === "medium") return "mid-term/series exam (40-60 marks) with moderate difficulty";
+    // Hard: class 11 = model/entrance, class 12 = board exam
+    if (cls === 11) return "model exam and entrance exam level questions for competitive preparation";
     return "board exam level questions including previous year board exam patterns";
   }
 
   // college
   if (difficulty === "easy") return "easy fundamental questions testing basic understanding";
   if (difficulty === "medium") return "series/internal exam level questions with moderate complexity";
-  return "university exam level with application-based and analytical questions";
+  return "university exam level with tough application-based and analytical questions, refer to KTU/university exam patterns";
 };
