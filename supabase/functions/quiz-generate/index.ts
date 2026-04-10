@@ -12,20 +12,24 @@ const difficultyMap: Record<string, { questions: number }> = {
   hard: { questions: 40 },
 };
 
-const getDifficultyContext = (educationLevel: string, difficulty: string) => {
+const getDifficultyContext = (educationLevel: string, difficulty: string, classOrYear: string) => {
   if (educationLevel === "school") {
+    const cls = parseInt(classOrYear || "1");
     if (difficulty === "easy") return "simple class test with basic recall questions";
     if (difficulty === "medium") return "mid-term exam (40-60 marks) with application-based questions";
-    return "annual/board exam level with analytical and higher-order thinking questions";
+    if (cls === 10) return "board exam level with analytical and higher-order thinking questions";
+    return "difficult level with analytical and higher-order thinking questions";
   }
   if (educationLevel === "higher_secondary") {
+    const cls = parseInt(classOrYear || "11");
     if (difficulty === "easy") return "simple class test with basic conceptual questions";
     if (difficulty === "medium") return "mid-term/series exam (40-60 marks) with moderate difficulty";
+    if (cls === 11) return "model exam and entrance exam level questions for competitive preparation";
     return "board exam level questions including previous year board exam patterns";
   }
   if (difficulty === "easy") return "easy fundamental questions testing basic understanding";
   if (difficulty === "medium") return "series/internal exam level questions with moderate complexity, refer to KTU/university patterns";
-  return "university exam level with application-based and analytical questions, refer to KTU/university exam patterns";
+  return "university exam level with tough application-based and analytical questions, refer to KTU/university exam patterns";
 };
 
 async function generateBatch(
