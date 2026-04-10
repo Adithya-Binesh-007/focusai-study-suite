@@ -53,12 +53,12 @@ export default function QuizSetup({ onStart, codingMode, onCodingStart }: QuizSe
   const [codingLanguage, setCodingLanguage] = useState<"c" | "python" | null>(null);
 
   const goBack = () => {
-    if (step === 0) return;
-    // Clear current step's selection and go back
+    if (step === 0 || (codingMode && step === 1)) return;
     if (step === 1) { setClassOrYear(null); }
     else if (step === 2) { setStream(null); setBranch(null); }
     else if (step === 3) { setSubject(null); }
     else if (step === 4) { setDifficulty(null); }
+    else if (step === 5) { setCodingLanguage(null); }
     setStep(step - 1);
   };
 
@@ -277,6 +277,45 @@ export default function QuizSetup({ onStart, codingMode, onCodingStart }: QuizSe
                   </Card>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Language selection (coding mode only) */}
+        {step === 5 && codingMode && (
+          <div className="space-y-4">
+            <div className="text-center space-y-2">
+              <h2 className="text-xl font-bold">Choose Language</h2>
+            </div>
+            <div className="grid gap-4">
+              <Card
+                className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
+                onClick={() => handleLanguageSelect("c")}
+              >
+                <CardContent className="flex items-center gap-4 p-5">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-mono font-bold text-primary">
+                    C
+                  </div>
+                  <div>
+                    <p className="font-semibold">C Programming</p>
+                    <p className="text-sm text-muted-foreground">scanf/printf based I/O</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
+                onClick={() => handleLanguageSelect("python")}
+              >
+                <CardContent className="flex items-center gap-4 p-5">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-mono font-bold text-primary">
+                    Py
+                  </div>
+                  <div>
+                    <p className="font-semibold">Python</p>
+                    <p className="text-sm text-muted-foreground">input()/print() based I/O</p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         )}
