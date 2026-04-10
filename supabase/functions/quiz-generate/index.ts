@@ -142,7 +142,7 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const numQuestions = difficultyMap[difficulty]?.questions || 10;
-    const context = getDifficultyContext(educationLevel, difficulty);
+    const context = getDifficultyContext(educationLevel, difficulty, classOrYear);
 
     let levelLabel = "";
     if (educationLevel === "school") levelLabel = `Class ${classOrYear}`;
