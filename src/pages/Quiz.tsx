@@ -34,6 +34,10 @@ export default function Quiz() {
     return <QuizPlayer config={config} onExit={reset} />;
   }
 
+  if (mode === "mcq" && !config) {
+    return <QuizSetup onStart={handleMcqStart} />;
+  }
+
   if (mode === "coding" && config) {
     return <CodingQuizPlayer config={config} language={codingLanguage} onExit={reset} />;
   }
