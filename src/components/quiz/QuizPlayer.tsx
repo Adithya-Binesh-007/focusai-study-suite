@@ -1,10 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, CheckCircle2, XCircle, ArrowRight, RotateCcw, Trophy, Loader2 } from "lucide-react";
-import { QuizConfig, difficultyLevels, getDifficultyContext } from "@/lib/quizData";
+import { Clock, CheckCircle2, XCircle, RotateCcw, Trophy, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
+import { QuizConfig, difficultyLevels, getDifficultyPresentation } from "@/lib/quizData";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface QuizQuestion {
@@ -21,6 +25,27 @@ interface QuizPlayerProps {
 
 type Phase = "loading" | "playing" | "review";
 
+function QuizRichText({ content, inline = false, className = "" }: { content: string; inline?: boolean; className?: string }) {
+  const wrapperClassName = inline ? className : `prose prose-sm max-w-none break-words dark:prose-invert ${className}`;
+
+  return (
+    <div className={wrapperClassName}>
+      <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children }) => inline ? <span>{children}</span> : <p className="mb-2 last:mb-0">{children}</p>,
+          ul: ({ children }) => <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>,
+          ol: ({ children }) => <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>,
+          li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -29,8 +54,17 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const autoAdvanceTimeoutRef = useRef<number | null>(null);
 
   const diffConfig = difficultyLevels.find((d) => d.value === config.difficulty)!;
+  const diffPresentation = getDifficultyPresentation(config, config.difficulty);
+
+  const clearPendingAdvance = () => {
+    if (autoAdvanceTimeoutRef.current !== null) {
+      window.clearTimeout(autoAdvanceTimeoutRef.current);
+      autoAdvanceTimeoutRef.current = null;
+    }
+  };
 
   // Generate quiz questions
   useEffect(() => {
@@ -59,7 +93,10 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
     };
 
     generate();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearPendingAdvance();
+    };
   }, [config]);
 
   // Timer
@@ -69,6 +106,7 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
       setTimeLeft((t) => {
         if (t <= 1) {
           clearInterval(timer);
+          clearPendingAdvance();
           setPhase("review");
           return 0;
         }
@@ -80,13 +118,15 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
 
   const handleSelect = (idx: number) => {
     if (selected !== null) return; // already answered
+    clearPendingAdvance();
     setSelected(idx);
     const updated = [...answers];
     updated[current] = idx;
     setAnswers(updated);
 
     // Auto-advance after a short delay to show feedback
-    setTimeout(() => {
+    autoAdvanceTimeoutRef.current = window.setTimeout(() => {
+      autoAdvanceTimeoutRef.current = null;
       if (current < questions.length - 1) {
         setCurrent((c) => c + 1);
         setSelected(null);
@@ -94,15 +134,6 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
         setPhase("review");
       }
     }, 1200);
-  };
-
-  const goNext = () => {
-    if (current < questions.length - 1) {
-      setCurrent(current + 1);
-      setSelected(null);
-    } else {
-      setPhase("review");
-    }
   };
 
   const formatTime = (s: number) => {
@@ -129,7 +160,7 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="text-muted-foreground">Generating your quiz…</p>
             <p className="text-xs text-muted-foreground">
-              {config.subject} • {diffConfig.label} • {diffConfig.questions} questions
+                {config.subject} • {diffPresentation.label} • {diffConfig.questions} questions
             </p>
           </>
         )}
@@ -140,9 +171,9 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
   // Review / Results
   if (phase === "review") {
     return (
-      <div className="flex flex-col items-center p-4 md:p-8 min-h-full overflow-y-auto">
-        <div className="w-full max-w-2xl space-y-6">
-          <Card className="border-primary/30">
+      <div className="flex h-full min-h-0 flex-col p-4 md:p-8">
+        <div className="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-6">
+          <Card className="shrink-0 border-primary/30">
             <CardContent className="flex flex-col items-center gap-4 p-8">
               <Trophy className="h-16 w-16 text-primary" />
               <h2 className="text-2xl font-bold">Quiz Complete!</h2>
@@ -161,46 +192,58 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
             </CardContent>
           </Card>
 
-          <h3 className="text-lg font-semibold">Review Answers</h3>
-          {questions.map((q, i) => {
-            const userAnswer = answers[i];
-            const isCorrect = userAnswer === q.correctIndex;
-            return (
-              <Card key={i} className={`border ${isCorrect ? "border-green-500/30" : "border-red-500/30"}`}>
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start gap-2">
-                    {isCorrect ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
-                    )}
-                    <p className="font-medium text-sm">Q{i + 1}. {q.question}</p>
-                  </div>
-                  <div className="grid gap-2 pl-7">
-                    {q.options.map((opt, oi) => (
-                      <div
-                        key={oi}
-                        className={`rounded-lg border px-3 py-2 text-sm ${
-                          oi === q.correctIndex
-                            ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
-                            : oi === userAnswer && oi !== q.correctIndex
-                            ? "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400"
-                            : "border-border"
-                        }`}
-                      >
-                        {String.fromCharCode(65 + oi)}) {opt}
+          <div className="min-h-0 flex-1 overflow-y-auto pr-2 quiz-scrollbar">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold">Review Answers</h3>
+                <p className="text-xs text-muted-foreground">Scroll to see every answer and mistake.</p>
+              </div>
+              {questions.map((q, i) => {
+                const userAnswer = answers[i];
+                const isCorrect = userAnswer === q.correctIndex;
+                return (
+                  <Card key={i} className={`border ${isCorrect ? "border-success/30" : "border-destructive/30"}`}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start gap-2">
+                        {isCorrect ? (
+                          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                        ) : (
+                          <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                        )}
+                        <div className="min-w-0 flex-1 text-sm font-medium">
+                          <span className="mr-1">Q{i + 1}.</span>
+                          <QuizRichText content={q.question} inline className="inline" />
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                  {q.explanation && (
-                    <p className="text-xs text-muted-foreground pl-7">
-                      <span className="font-medium">Explanation:</span> {q.explanation}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                      <div className="grid gap-2 pl-7">
+                        {q.options.map((opt, oi) => (
+                          <div
+                            key={oi}
+                            className={`rounded-lg border px-3 py-2 text-sm ${
+                              oi === q.correctIndex
+                                ? "border-success/50 bg-success/10 text-success"
+                                : oi === userAnswer && oi !== q.correctIndex
+                                  ? "border-destructive/50 bg-destructive/10 text-destructive"
+                                  : "border-border"
+                            }`}
+                          >
+                            <span className="mr-2 font-medium">{String.fromCharCode(65 + oi)})</span>
+                            <QuizRichText content={opt} inline className="inline" />
+                          </div>
+                        ))}
+                      </div>
+                      {q.explanation && (
+                        <div className="pl-7 text-xs text-muted-foreground">
+                          <span className="font-medium">Explanation:</span>
+                          <QuizRichText content={q.explanation} className="mt-1" />
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -227,7 +270,9 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
         {/* Question */}
         <Card>
           <CardContent className="p-6">
-            <p className="font-semibold text-base leading-relaxed">{q.question}</p>
+            <div className="font-semibold text-base leading-relaxed">
+              <QuizRichText content={q.question} />
+            </div>
           </CardContent>
         </Card>
 
@@ -243,8 +288,8 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
                 key={oi}
                 className={`cursor-pointer transition-all ${
                   selected === null ? "hover:border-primary hover:shadow-md" : ""
-                } ${isCorrect ? "border-green-500 bg-green-500/10" : ""} ${isWrong ? "border-red-500 bg-red-500/10" : ""} ${
-                  isSelected && isCorrect ? "border-green-500 bg-green-500/10" : ""
+                } ${isCorrect ? "border-success bg-success/10" : ""} ${isWrong ? "border-destructive bg-destructive/10" : ""} ${
+                  isSelected && isCorrect ? "border-success bg-success/10" : ""
                 }`}
                 onClick={() => handleSelect(oi)}
               >
@@ -252,9 +297,11 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-medium">
                     {String.fromCharCode(65 + oi)}
                   </span>
-                  <span className="text-sm">{opt}</span>
-                  {isCorrect && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
-                  {isWrong && <XCircle className="h-5 w-5 text-red-500 ml-auto" />}
+                  <div className="text-sm">
+                    <QuizRichText content={opt} inline className="inline" />
+                  </div>
+                  {isCorrect && <CheckCircle2 className="ml-auto h-5 w-5 text-success" />}
+                  {isWrong && <XCircle className="ml-auto h-5 w-5 text-destructive" />}
                 </CardContent>
               </Card>
             );
@@ -265,19 +312,15 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
         {selected !== null && q.explanation && (
           <div className="rounded-lg border bg-muted/50 p-4 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">Explanation: </span>
-            {q.explanation}
+            <QuizRichText content={q.explanation} inline className="inline" />
           </div>
         )}
 
-        {/* Next button */}
+        {/* Auto-advance status */}
         {selected !== null && (
-          <Button onClick={goNext} className="w-full gap-2">
-            {current < questions.length - 1 ? (
-              <>Next <ArrowRight className="h-4 w-4" /></>
-            ) : (
-              <>View Results <Trophy className="h-4 w-4" /></>
-            )}
-          </Button>
+          <div className="rounded-lg border bg-muted/50 px-4 py-3 text-center text-sm text-muted-foreground">
+            {current < questions.length - 1 ? "Moving to the next question…" : "Preparing your results…"}
+          </div>
         )}
       </div>
     </div>

@@ -134,4 +134,30 @@
     backdrop-filter: blur(12px);
     border: 1px solid hsl(var(--border) / 0.5);
   }
+
+  .quiz-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-gutter: stable;
+  }
+
+  .quiz-scrollbar::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .quiz-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .quiz-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: content-box;
+  }
+
+  .quiz-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.55);
+    background-clip: content-box;
+  }
 }
