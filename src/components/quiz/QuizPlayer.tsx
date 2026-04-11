@@ -26,20 +26,23 @@ interface QuizPlayerProps {
 type Phase = "loading" | "playing" | "review";
 
 function QuizRichText({ content, inline = false, className = "" }: { content: string; inline?: boolean; className?: string }) {
+  const wrapperClassName = inline ? className : `prose prose-sm max-w-none break-words dark:prose-invert ${className}`;
+
   return (
-    <ReactMarkdown
-      className={inline ? className : `prose prose-sm max-w-none break-words dark:prose-invert ${className}`}
-      remarkPlugins={[remarkMath]}
-      rehypePlugins={[rehypeKatex]}
-      components={{
-        p: ({ children }) => inline ? <span>{children}</span> : <p className="mb-2 last:mb-0">{children}</p>,
-        ul: ({ children }) => <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>,
-        ol: ({ children }) => <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>,
-        li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
+    <div className={wrapperClassName}>
+      <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children }) => inline ? <span>{children}</span> : <p className="mb-2 last:mb-0">{children}</p>,
+          ul: ({ children }) => <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>,
+          ol: ({ children }) => <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>,
+          li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 }
 
@@ -199,13 +202,13 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
                 const userAnswer = answers[i];
                 const isCorrect = userAnswer === q.correctIndex;
                 return (
-                  <Card key={i} className={`border ${isCorrect ? "border-green-500/30" : "border-red-500/30"}`}>
+                  <Card key={i} className={`border ${isCorrect ? "border-success/30" : "border-destructive/30"}`}>
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start gap-2">
                         {isCorrect ? (
-                          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
+                          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
                         ) : (
-                          <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                          <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
                         )}
                         <div className="min-w-0 flex-1 text-sm font-medium">
                           <span className="mr-1">Q{i + 1}.</span>
@@ -218,9 +221,9 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
                             key={oi}
                             className={`rounded-lg border px-3 py-2 text-sm ${
                               oi === q.correctIndex
-                                ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
+                                ? "border-success/50 bg-success/10 text-success"
                                 : oi === userAnswer && oi !== q.correctIndex
-                                  ? "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400"
+                                  ? "border-destructive/50 bg-destructive/10 text-destructive"
                                   : "border-border"
                             }`}
                           >
@@ -285,8 +288,8 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
                 key={oi}
                 className={`cursor-pointer transition-all ${
                   selected === null ? "hover:border-primary hover:shadow-md" : ""
-                } ${isCorrect ? "border-green-500 bg-green-500/10" : ""} ${isWrong ? "border-red-500 bg-red-500/10" : ""} ${
-                  isSelected && isCorrect ? "border-green-500 bg-green-500/10" : ""
+                } ${isCorrect ? "border-success bg-success/10" : ""} ${isWrong ? "border-destructive bg-destructive/10" : ""} ${
+                  isSelected && isCorrect ? "border-success bg-success/10" : ""
                 }`}
                 onClick={() => handleSelect(oi)}
               >
@@ -297,8 +300,8 @@ export default function QuizPlayer({ config, onExit }: QuizPlayerProps) {
                   <div className="text-sm">
                     <QuizRichText content={opt} inline className="inline" />
                   </div>
-                  {isCorrect && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
-                  {isWrong && <XCircle className="h-5 w-5 text-red-500 ml-auto" />}
+                  {isCorrect && <CheckCircle2 className="ml-auto h-5 w-5 text-success" />}
+                  {isWrong && <XCircle className="ml-auto h-5 w-5 text-destructive" />}
                 </CardContent>
               </Card>
             );
