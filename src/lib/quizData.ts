@@ -55,17 +55,76 @@ export const difficultyLevels: { value: Difficulty; label: string; description: 
   { value: "hard", label: "Hard", description: "Board / university exam level", questions: 40, time: 60 },
 ];
 
+const programmingSubjects = new Set([
+  "Computer Science (Python)",
+  "Computer Science (C++)",
+  "Programming in C",
+  "Python Programming",
+]);
+
+const competitiveScienceSubjects = new Set(["Physics", "Chemistry", "Mathematics", "Biology"]);
+
 // Subjects by education level
 const primarySubjects = ["Mathematics", "English", "Science", "Social Studies", "Hindi", "Environmental Studies"];
 const middleSubjects = ["Mathematics", "English", "Science", "Social Studies", "Hindi", "Computer Science"];
 const highSubjects = ["Mathematics", "English", "Science", "Social Studies", "Hindi", "Computer Science", "Physics", "Chemistry", "Biology"];
 
-const scienceSubjects11_12 = ["Physics", "Chemistry", "Mathematics", "Biology", "Computer Science", "English"];
+const scienceSubjects11_12 = [
+  "Physics",
+  "Chemistry",
+  "Mathematics",
+  "Biology",
+  "Computer Science (Python)",
+  "Computer Science (C++)",
+  "English",
+];
 const commerceSubjects11_12 = ["Accountancy", "Business Studies", "Economics", "Mathematics", "English"];
 const humanitiesSubjects11_12 = ["History", "Political Science", "Geography", "Psychology", "Sociology", "English", "Economics"];
 
 // B.Tech subjects by branch and year
-const btechCommonYear1 = ["Engineering Mathematics I", "Engineering Mathematics II", "Engineering Physics", "Engineering Chemistry", "Programming in C", "English Communication"];
+const btechCommonYear1 = [
+  "Engineering Mathematics I",
+  "Engineering Mathematics II",
+  "Engineering Physics",
+  "Engineering Chemistry",
+  "Programming in C",
+  "Python Programming",
+  "Engineering Graphics",
+  "Basics of Electrical & Electronics Engineering",
+  "English Communication",
+];
+
+export const isProgrammingSubject = (subject?: string) => Boolean(subject && programmingSubjects.has(subject));
+
+export const getDifficultyPresentation = (config: Partial<QuizConfig>, difficulty: Difficulty) => {
+  const fallback = difficultyLevels.find((level) => level.value === difficulty)!;
+
+  if (isProgrammingSubject(config.subject) && ["higher_secondary", "college"].includes(config.educationLevel || "")) {
+    if (difficulty === "easy") {
+      return {
+        ...fallback,
+        label: "Basics",
+        description: "Syntax, core concepts, and simple program logic",
+      };
+    }
+
+    if (difficulty === "medium") {
+      return {
+        ...fallback,
+        label: "Intermediate",
+        description: "Tracing, functions, debugging, and moderate applications",
+      };
+    }
+
+    return {
+      ...fallback,
+      label: "Hard",
+      description: "Tough application-level logic and exam-style programming questions",
+    };
+  }
+
+  return fallback;
+};
 
 const btechSubjects: Record<string, Record<string, string[]>> = {
   cse: {
@@ -131,7 +190,19 @@ export const getSubjects = (config: Partial<QuizConfig>): string[] => {
 };
 
 export const getDifficultyContext = (config: QuizConfig): string => {
-  const { educationLevel, difficulty, classOrYear } = config;
+  const { educationLevel, difficulty, classOrYear, subject, stream } = config;
+
+  if (isProgrammingSubject(subject) && ["higher_secondary", "college"].includes(educationLevel)) {
+    const programmingScope = subject === "Computer Science (C++)"
+      ? "C++ syntax, loops, functions, arrays, strings, classes, and output tracing"
+      : "syntax, variables, control flow, functions, arrays/lists, strings, files, and output tracing";
+
+    if (difficulty === "easy") return `basic programming questions focused on ${programmingScope}`;
+    if (difficulty === "medium") return `intermediate programming questions with debugging, output prediction, and applications of ${programmingScope}`;
+    return educationLevel === "higher_secondary"
+      ? "hard programming questions with application-level logic, debugging, output prediction, and exam-style problem solving"
+      : "university exam level tough programming questions with application-level logic, debugging, output prediction, and program analysis";
+  }
 
   if (educationLevel === "school") {
     const cls = parseInt(classOrYear || "1");
@@ -147,8 +218,14 @@ export const getDifficultyContext = (config: QuizConfig): string => {
     if (difficulty === "easy") return "simple class test with basic conceptual questions";
     if (difficulty === "medium") return "mid-term/series exam (40-60 marks) with moderate difficulty";
     // Hard: class 11 = model/entrance, class 12 = board exam
-    if (cls === 11) return "model exam and entrance exam level questions for competitive preparation";
-    return "board exam level questions including previous year board exam patterns";
+    if (cls === 11) {
+      return stream === "science" && competitiveScienceSubjects.has(subject)
+        ? "model exam and entrance exam level questions for competitive preparation, including JEE/NEET-oriented conceptual and application questions where relevant"
+        : "model exam and entrance exam level questions for competitive preparation";
+    }
+    return stream === "science" && competitiveScienceSubjects.has(subject)
+      ? "board exam level questions including previous year board exam patterns, with JEE/NEET-oriented conceptual and application questions where relevant"
+      : "board exam level questions including previous year board exam patterns";
   }
 
   // college

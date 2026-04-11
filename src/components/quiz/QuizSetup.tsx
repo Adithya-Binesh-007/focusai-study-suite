@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   QuizConfig,
   EducationLevel,
@@ -14,14 +13,13 @@ import {
   streams,
   btechBranches,
   difficultyLevels,
+  getDifficultyPresentation,
   getSubjects,
 } from "@/lib/quizData";
 import { GraduationCap, BookOpen, Building2, ArrowLeft, Clock, HelpCircle, Zap, Flame, Target } from "lucide-react";
 
 interface QuizSetupProps {
   onStart: (config: QuizConfig) => void;
-  codingMode?: boolean;
-  onCodingStart?: (config: QuizConfig, language: "c" | "python") => void;
 }
 
 const levelIcons: Record<EducationLevel, typeof GraduationCap> = {
@@ -42,23 +40,21 @@ const difficultyColors: Record<Difficulty, string> = {
   hard: "bg-red-500/10 text-red-500 border-red-500/30",
 };
 
-export default function QuizSetup({ onStart, codingMode, onCodingStart }: QuizSetupProps) {
-  const [step, setStep] = useState(codingMode ? 1 : 0);
-  const [educationLevel, setEducationLevel] = useState<EducationLevel | null>(codingMode ? "college" : null);
+export default function QuizSetup({ onStart }: QuizSetupProps) {
+  const [step, setStep] = useState(0);
+  const [educationLevel, setEducationLevel] = useState<EducationLevel | null>(null);
   const [classOrYear, setClassOrYear] = useState<string | null>(null);
   const [stream, setStream] = useState<Stream | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
   const [subject, setSubject] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
-  const [codingLanguage, setCodingLanguage] = useState<"c" | "python" | null>(null);
 
   const goBack = () => {
-    if (step === 0 || (codingMode && step === 1)) return;
+    if (step === 0) return;
     if (step === 1) { setClassOrYear(null); }
     else if (step === 2) { setStream(null); setBranch(null); }
     else if (step === 3) { setSubject(null); }
     else if (step === 4) { setDifficulty(null); }
-    else if (step === 5) { setCodingLanguage(null); }
     setStep(step - 1);
   };
 
@@ -95,34 +91,21 @@ export default function QuizSetup({ onStart, codingMode, onCodingStart }: QuizSe
 
   const handleDifficulty = (diff: Difficulty) => {
     setDifficulty(diff);
-    const config: QuizConfig = {
+    onStart({
       educationLevel: educationLevel!,
       classOrYear: classOrYear!,
       stream: stream || undefined,
       branch: branch || undefined,
       subject: subject!,
       difficulty: diff,
-    };
-    if (codingMode) {
-      setStep(5); // language selection step
-    } else {
-      onStart(config);
-    }
-  };
-
-  const handleLanguageSelect = (lang: "c" | "python") => {
-    setCodingLanguage(lang);
-    const config: QuizConfig = {
-      educationLevel: educationLevel!,
-      classOrYear: classOrYear!,
-      branch: branch || undefined,
-      subject: subject!,
-      difficulty: difficulty!,
-    };
-    onCodingStart?.(config, lang);
+    });
   };
 
   const subjects = getSubjects({ educationLevel: educationLevel || undefined, classOrYear: classOrYear || undefined, stream: stream || undefined, branch: branch || undefined });
+  const showCompetitivePrepHint =
+    educationLevel === "higher_secondary" &&
+    stream === "science" &&
+    ["Physics", "Chemistry", "Mathematics", "Biology"].includes(subject || "");
 
   return (
     <div className="flex flex-col items-center justify-center p-4 md:p-8 min-h-full">
@@ -245,10 +228,25 @@ export default function QuizSetup({ onStart, codingMode, onCodingStart }: QuizSe
           <div className="space-y-4">
             <div className="text-center space-y-2">
               <h2 className="text-xl font-bold">Select Difficulty</h2>
+              {showCompetitivePrepHint && (
+                <p className="text-sm text-muted-foreground">
+                  Hard level adds JEE/NEET-style preparation where relevant.
+                </p>
+              )}
             </div>
             <div className="grid gap-4">
               {difficultyLevels.map((diff) => {
                 const Icon = difficultyIcons[diff.value];
+                const difficultyMeta = getDifficultyPresentation(
+                  {
+                    educationLevel: educationLevel || undefined,
+                    classOrYear: classOrYear || undefined,
+                    stream: stream || undefined,
+                    branch: branch || undefined,
+                    subject: subject || undefined,
+                  },
+                  diff.value,
+                );
                 return (
                   <Card
                     key={diff.value}
@@ -260,8 +258,8 @@ export default function QuizSetup({ onStart, codingMode, onCodingStart }: QuizSe
                         <Icon className="h-6 w-6" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-semibold">{diff.label}</p>
-                        <p className="text-sm text-muted-foreground">{diff.description}</p>
+                        <p className="font-semibold">{difficultyMeta.label}</p>
+                        <p className="text-sm text-muted-foreground">{difficultyMeta.description}</p>
                       </div>
                       <div className="text-right text-xs text-muted-foreground space-y-1">
                         <div className="flex items-center gap-1 justify-end">
@@ -277,45 +275,6 @@ export default function QuizSetup({ onStart, codingMode, onCodingStart }: QuizSe
                   </Card>
                 );
               })}
-            </div>
-          </div>
-        )}
-
-        {/* Step 5: Language selection (coding mode only) */}
-        {step === 5 && codingMode && (
-          <div className="space-y-4">
-            <div className="text-center space-y-2">
-              <h2 className="text-xl font-bold">Choose Language</h2>
-            </div>
-            <div className="grid gap-4">
-              <Card
-                className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
-                onClick={() => handleLanguageSelect("c")}
-              >
-                <CardContent className="flex items-center gap-4 p-5">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-mono font-bold text-primary">
-                    C
-                  </div>
-                  <div>
-                    <p className="font-semibold">C Programming</p>
-                    <p className="text-sm text-muted-foreground">scanf/printf based I/O</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card
-                className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
-                onClick={() => handleLanguageSelect("python")}
-              >
-                <CardContent className="flex items-center gap-4 p-5">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-mono font-bold text-primary">
-                    Py
-                  </div>
-                  <div>
-                    <p className="font-semibold">Python</p>
-                    <p className="text-sm text-muted-foreground">input()/print() based I/O</p>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </div>
         )}
