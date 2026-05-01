@@ -228,12 +228,12 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-          const { educationLevel, classOrYear, stream, branch, subject, difficulty } = await req.json();
+          const { educationLevel, classOrYear, stream, scienceTrack, branch, subject, difficulty } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const numQuestions = difficultyMap[difficulty]?.questions || 10;
-    const context = getDifficultyContext(educationLevel, difficulty, classOrYear, subject, stream);
+    const context = getDifficultyContext(educationLevel, difficulty, classOrYear, subject, stream, scienceTrack);
     const subjectGuidance = getSubjectSpecificGuidance(educationLevel, classOrYear, stream, subject, difficulty);
 
     let levelLabel = "";
