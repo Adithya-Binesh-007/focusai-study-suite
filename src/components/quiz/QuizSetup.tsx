@@ -47,23 +47,32 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
   const [educationLevel, setEducationLevel] = useState<EducationLevel | null>(null);
   const [classOrYear, setClassOrYear] = useState<string | null>(null);
   const [stream, setStream] = useState<Stream | null>(null);
+  const [scienceTrack, setScienceTrack] = useState<ScienceTrack | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
   const [subject, setSubject] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
 
+  // Steps: 0 level, 1 class/year, 2 stream/branch, 25 science track, 3 subject, 4 difficulty
   const goBack = () => {
     if (step === 0) return;
-    if (step === 1) { setClassOrYear(null); }
-    else if (step === 2) { setStream(null); setBranch(null); }
-    else if (step === 3) { setSubject(null); }
-    else if (step === 4) { setDifficulty(null); }
-    setStep(step - 1);
+    if (step === 1) { setClassOrYear(null); setStep(0); return; }
+    if (step === 2) { setStream(null); setBranch(null); setStep(1); return; }
+    if (step === 25) { setScienceTrack(null); setStep(2); return; }
+    if (step === 3) {
+      setSubject(null);
+      if (educationLevel === "higher_secondary" && stream === "science") setStep(25);
+      else if (educationLevel === "school") setStep(1);
+      else setStep(2);
+      return;
+    }
+    if (step === 4) { setDifficulty(null); setStep(3); return; }
   };
 
   const handleLevelSelect = (level: EducationLevel) => {
     setEducationLevel(level);
     setClassOrYear(null);
     setStream(null);
+    setScienceTrack(null);
     setBranch(null);
     setSubject(null);
     setDifficulty(null);
@@ -72,17 +81,27 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
 
   const handleClassSelect = (cls: string) => {
     setClassOrYear(cls);
-    // School doesn't need stream/branch; higher_secondary needs stream; college needs branch
-    if (educationLevel === "school") setStep(3); // skip to subject
-    else setStep(2); // stream or branch
+    if (educationLevel === "school") setStep(3);
+    else setStep(2);
   };
 
   const handleStreamOrBranch = (value: string) => {
     if (educationLevel === "higher_secondary") {
-      setStream(value as Stream);
+      const s = value as Stream;
+      setStream(s);
+      if (s === "science") {
+        setStep(25);
+        return;
+      }
     } else {
       setBranch(value);
     }
+    setStep(3);
+  };
+
+  const handleScienceTrack = (track: ScienceTrack) => {
+    setScienceTrack(track);
+    setSubject(null);
     setStep(3);
   };
 
@@ -97,16 +116,24 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
       educationLevel: educationLevel!,
       classOrYear: classOrYear!,
       stream: stream || undefined,
+      scienceTrack: scienceTrack || undefined,
       branch: branch || undefined,
       subject: subject!,
       difficulty: diff,
     });
   };
 
-  const subjects = getSubjects({ educationLevel: educationLevel || undefined, classOrYear: classOrYear || undefined, stream: stream || undefined, branch: branch || undefined });
+  const subjects = getSubjects({
+    educationLevel: educationLevel || undefined,
+    classOrYear: classOrYear || undefined,
+    stream: stream || undefined,
+    scienceTrack: scienceTrack || undefined,
+    branch: branch || undefined,
+  });
   const showCompetitivePrepHint =
     educationLevel === "higher_secondary" &&
     stream === "science" &&
+    !!scienceTrack &&
     ["Physics", "Chemistry", "Mathematics", "Biology"].includes(subject || "");
 
   return (
