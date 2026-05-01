@@ -230,6 +230,40 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
           </div>
         )}
 
+        {/* Step 25: Science Track (Medical vs Engineering) */}
+        {step === 25 && (
+          <div className="space-y-4">
+            <div className="text-center space-y-2">
+              <h2 className="text-xl font-bold">Choose Your Goal</h2>
+              <p className="text-sm text-muted-foreground">
+                Pick the track you're preparing for — subjects and difficulty levels are tailored accordingly.
+              </p>
+            </div>
+            <div className="grid gap-4">
+              {scienceTracks.map((track) => {
+                const Icon = track.value === "medical" ? Stethoscope : Cog;
+                return (
+                  <Card
+                    key={track.value}
+                    className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
+                    onClick={() => handleScienceTrack(track.value)}
+                  >
+                    <CardContent className="flex items-center gap-4 p-5">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                        <Icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold">{track.label}</p>
+                        <p className="text-sm text-muted-foreground">{track.description}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Step 3: Subject */}
         {step === 3 && (
           <div className="space-y-4">
