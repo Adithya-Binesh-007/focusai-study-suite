@@ -293,7 +293,9 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
               <h2 className="text-xl font-bold">Select Difficulty</h2>
               {showCompetitivePrepHint && (
                 <p className="text-sm text-muted-foreground">
-                  Hard level adds JEE/NEET-style preparation where relevant.
+                  {scienceTrack === "medical"
+                    ? "Levels are tuned for NEET-UG preparation (Physics, Chemistry, Biology)."
+                    : "Levels are tuned for JEE Mains, KEAM, and JEE Advanced preparation."}
                 </p>
               )}
             </div>
