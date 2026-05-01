@@ -215,7 +215,7 @@ export const getSubjects = (config: Partial<QuizConfig>): string[] => {
 };
 
 export const getDifficultyContext = (config: QuizConfig): string => {
-  const { educationLevel, difficulty, classOrYear, subject, stream } = config;
+  const { educationLevel, difficulty, classOrYear, subject, stream, scienceTrack } = config;
 
   if (isProgrammingSubject(subject) && ["higher_secondary", "college"].includes(educationLevel)) {
     const programmingScope = subject === "Computer Science (C++)"
@@ -233,24 +233,29 @@ export const getDifficultyContext = (config: QuizConfig): string => {
     const cls = parseInt(classOrYear || "1");
     if (difficulty === "easy") return "simple class test with basic recall questions";
     if (difficulty === "medium") return "mid-term exam (40-60 marks) with application-based questions";
-    // Hard: only class 10 gets "board exam level", rest get "difficult level"
     if (cls === 10) return "board exam level with analytical and higher-order thinking questions";
     return "difficult level with analytical and higher-order thinking questions";
   }
 
   if (educationLevel === "higher_secondary") {
+    // Science with explicit track — focused exam-pattern questions
+    if (stream === "science" && scienceTrack && competitiveScienceSubjects.has(subject)) {
+      if (scienceTrack === "medical") {
+        if (difficulty === "easy") return "simple class test with basic NCERT recall and conceptual questions";
+        if (difficulty === "medium") return "Class 11/12 board exam pattern questions following NCERT syllabus";
+        return "NEET-UG (undergraduate) level questions: conceptual, application-based, and numerical problems strictly aligned with NEET-UG pattern (Physics, Chemistry, Biology). Do NOT include postgraduate content.";
+      }
+      // engineering
+      if (difficulty === "easy") return "Class 11/12 board exam pattern questions following NCERT syllabus";
+      if (difficulty === "medium") return "JEE Mains and Kerala KEAM level questions: objective, application-based problems aligned with JEE Mains and KEAM patterns";
+      return "JEE Advanced level tough questions: multi-concept, analytical, and application-heavy problems strictly aligned with JEE Advanced pattern (only attempt after qualifying Mains)";
+    }
+
     const cls = parseInt(classOrYear || "11");
     if (difficulty === "easy") return "simple class test with basic conceptual questions";
     if (difficulty === "medium") return "mid-term/series exam (40-60 marks) with moderate difficulty";
-    // Hard: class 11 = model/entrance, class 12 = board exam
-    if (cls === 11) {
-      return stream === "science" && competitiveScienceSubjects.has(subject)
-        ? "model exam and entrance exam level questions for competitive preparation, including JEE/NEET-oriented conceptual and application questions where relevant"
-        : "model exam and entrance exam level questions for competitive preparation";
-    }
-    return stream === "science" && competitiveScienceSubjects.has(subject)
-      ? "board exam level questions including previous year board exam patterns, with JEE/NEET-oriented conceptual and application questions where relevant"
-      : "board exam level questions including previous year board exam patterns";
+    if (cls === 11) return "model exam and entrance exam level questions for competitive preparation";
+    return "board exam level questions including previous year board exam patterns";
   }
 
   // college
