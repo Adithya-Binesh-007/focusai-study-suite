@@ -1,15 +1,22 @@
 export type EducationLevel = "school" | "higher_secondary" | "college";
 export type Difficulty = "easy" | "medium" | "hard";
 export type Stream = "science" | "commerce" | "humanities";
+export type ScienceTrack = "medical" | "engineering";
 
 export interface QuizConfig {
   educationLevel: EducationLevel;
   classOrYear: string;
   stream?: Stream;
+  scienceTrack?: ScienceTrack;
   branch?: string;
   subject: string;
   difficulty: Difficulty;
 }
+
+export const scienceTracks: { value: ScienceTrack; label: string; description: string }[] = [
+  { value: "medical", label: "Medical (NEET)", description: "Physics, Chemistry, Biology — for MBBS/BDS via NEET-UG" },
+  { value: "engineering", label: "Engineering (JEE / KEAM)", description: "Physics, Chemistry, Mathematics — for IIT/NIT via JEE & Kerala via KEAM" },
+];
 
 export const educationLevels: { value: EducationLevel; label: string; description: string }[] = [
   { value: "school", label: "School (Class 1–10)", description: "Standard school curriculum" },
