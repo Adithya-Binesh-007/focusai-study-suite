@@ -176,8 +176,18 @@ const btechSubjects: Record<string, Record<string, string[]>> = {
   },
 };
 
+const medicalSubjects = ["Physics", "Chemistry", "Biology", "English"];
+const engineeringSubjects = [
+  "Physics",
+  "Chemistry",
+  "Mathematics",
+  "Computer Science (Python)",
+  "Computer Science (C++)",
+  "English",
+];
+
 export const getSubjects = (config: Partial<QuizConfig>): string[] => {
-  const { educationLevel, classOrYear, stream, branch } = config;
+  const { educationLevel, classOrYear, stream, scienceTrack, branch } = config;
 
   if (educationLevel === "school") {
     const cls = parseInt(classOrYear || "1");
@@ -187,7 +197,11 @@ export const getSubjects = (config: Partial<QuizConfig>): string[] => {
   }
 
   if (educationLevel === "higher_secondary") {
-    if (stream === "science") return scienceSubjects11_12;
+    if (stream === "science") {
+      if (scienceTrack === "medical") return medicalSubjects;
+      if (scienceTrack === "engineering") return engineeringSubjects;
+      return scienceSubjects11_12;
+    }
     if (stream === "commerce") return commerceSubjects11_12;
     if (stream === "humanities") return humanitiesSubjects11_12;
     return [];
