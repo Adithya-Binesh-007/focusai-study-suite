@@ -114,7 +114,7 @@ export default function Index() {
             className="w-full flex items-center justify-between rounded-xl border border-border bg-card p-6 hover:shadow-lg transition-shadow"
           >
             <div className="text-left">
-              <h3 className="font-semibold text-lg mb-1">Meet the Team</h3>
+              <h3 className="font-semibold text-lg mb-1">About The Developer</h3>
               <p className="text-sm text-muted-foreground">Dedicated developers behind FocusAI</p>
             </div>
             <ChevronDown 
