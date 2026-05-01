@@ -307,6 +307,7 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
                     educationLevel: educationLevel || undefined,
                     classOrYear: classOrYear || undefined,
                     stream: stream || undefined,
+                    scienceTrack: scienceTrack || undefined,
                     branch: branch || undefined,
                     subject: subject || undefined,
                   },
