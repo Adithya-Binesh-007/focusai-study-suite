@@ -27,6 +27,7 @@ const getDifficultyContext = (
   classOrYear: string,
   subject: string,
   stream?: string,
+  scienceTrack?: string,
 ) => {
   if (programmingSubjects.has(subject) && ["higher_secondary", "college"].includes(educationLevel)) {
     if (difficulty === "easy") return "basic programming questions covering syntax, core concepts, and simple program logic";
@@ -44,17 +45,24 @@ const getDifficultyContext = (
     return "difficult level with analytical and higher-order thinking questions";
   }
   if (educationLevel === "higher_secondary") {
+    // Science with explicit goal track
+    if (stream === "science" && scienceTrack && competitiveScienceSubjects.has(subject)) {
+      if (scienceTrack === "medical") {
+        if (difficulty === "easy") return "simple class test with basic NCERT recall and conceptual questions";
+        if (difficulty === "medium") return "Class 11/12 board exam pattern questions following NCERT syllabus";
+        return "NEET-UG (undergraduate) level questions strictly aligned with NEET-UG pattern: conceptual, application-based, and numerical problems in Physics, Chemistry, and Biology. Do NOT include postgraduate (NEET-PG) content.";
+      }
+      // engineering
+      if (difficulty === "easy") return "Class 11/12 board exam pattern questions following NCERT syllabus";
+      if (difficulty === "medium") return "JEE Mains and Kerala KEAM level questions: objective, application-based problems strictly aligned with JEE Mains and KEAM patterns";
+      return "JEE Advanced level tough questions: multi-concept, analytical, and application-heavy problems strictly aligned with JEE Advanced pattern (the second-stage exam after qualifying JEE Mains)";
+    }
+
     const cls = parseInt(classOrYear || "11");
     if (difficulty === "easy") return "simple class test with basic conceptual questions";
     if (difficulty === "medium") return "mid-term/series exam (40-60 marks) with moderate difficulty";
-    if (cls === 11) {
-      return stream === "science" && competitiveScienceSubjects.has(subject)
-        ? "model exam and entrance exam level questions for competitive preparation, including JEE/NEET-oriented conceptual and application questions where relevant"
-        : "model exam and entrance exam level questions for competitive preparation";
-    }
-    return stream === "science" && competitiveScienceSubjects.has(subject)
-      ? "board exam level questions including previous year board exam patterns, with JEE/NEET-oriented conceptual and application questions where relevant"
-      : "board exam level questions including previous year board exam patterns";
+    if (cls === 11) return "model exam and entrance exam level questions for competitive preparation";
+    return "board exam level questions including previous year board exam patterns";
   }
   if (difficulty === "easy") return "easy fundamental questions testing basic understanding";
   if (difficulty === "medium") return "series/internal exam level questions with moderate complexity, refer to KTU/university patterns";
