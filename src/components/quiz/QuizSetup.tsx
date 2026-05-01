@@ -6,17 +6,19 @@ import {
   EducationLevel,
   Difficulty,
   Stream,
+  ScienceTrack,
   educationLevels,
   schoolClasses,
   higherSecondaryClasses,
   collegeYears,
   streams,
+  scienceTracks,
   btechBranches,
   difficultyLevels,
   getDifficultyPresentation,
   getSubjects,
 } from "@/lib/quizData";
-import { GraduationCap, BookOpen, Building2, ArrowLeft, Clock, HelpCircle, Zap, Flame, Target } from "lucide-react";
+import { GraduationCap, BookOpen, Building2, ArrowLeft, Clock, HelpCircle, Zap, Flame, Target, Stethoscope, Cog } from "lucide-react";
 
 interface QuizSetupProps {
   onStart: (config: QuizConfig) => void;
@@ -45,23 +47,32 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
   const [educationLevel, setEducationLevel] = useState<EducationLevel | null>(null);
   const [classOrYear, setClassOrYear] = useState<string | null>(null);
   const [stream, setStream] = useState<Stream | null>(null);
+  const [scienceTrack, setScienceTrack] = useState<ScienceTrack | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
   const [subject, setSubject] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
 
+  // Steps: 0 level, 1 class/year, 2 stream/branch, 25 science track, 3 subject, 4 difficulty
   const goBack = () => {
     if (step === 0) return;
-    if (step === 1) { setClassOrYear(null); }
-    else if (step === 2) { setStream(null); setBranch(null); }
-    else if (step === 3) { setSubject(null); }
-    else if (step === 4) { setDifficulty(null); }
-    setStep(step - 1);
+    if (step === 1) { setClassOrYear(null); setStep(0); return; }
+    if (step === 2) { setStream(null); setBranch(null); setStep(1); return; }
+    if (step === 25) { setScienceTrack(null); setStep(2); return; }
+    if (step === 3) {
+      setSubject(null);
+      if (educationLevel === "higher_secondary" && stream === "science") setStep(25);
+      else if (educationLevel === "school") setStep(1);
+      else setStep(2);
+      return;
+    }
+    if (step === 4) { setDifficulty(null); setStep(3); return; }
   };
 
   const handleLevelSelect = (level: EducationLevel) => {
     setEducationLevel(level);
     setClassOrYear(null);
     setStream(null);
+    setScienceTrack(null);
     setBranch(null);
     setSubject(null);
     setDifficulty(null);
@@ -70,17 +81,27 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
 
   const handleClassSelect = (cls: string) => {
     setClassOrYear(cls);
-    // School doesn't need stream/branch; higher_secondary needs stream; college needs branch
-    if (educationLevel === "school") setStep(3); // skip to subject
-    else setStep(2); // stream or branch
+    if (educationLevel === "school") setStep(3);
+    else setStep(2);
   };
 
   const handleStreamOrBranch = (value: string) => {
     if (educationLevel === "higher_secondary") {
-      setStream(value as Stream);
+      const s = value as Stream;
+      setStream(s);
+      if (s === "science") {
+        setStep(25);
+        return;
+      }
     } else {
       setBranch(value);
     }
+    setStep(3);
+  };
+
+  const handleScienceTrack = (track: ScienceTrack) => {
+    setScienceTrack(track);
+    setSubject(null);
     setStep(3);
   };
 
@@ -95,16 +116,24 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
       educationLevel: educationLevel!,
       classOrYear: classOrYear!,
       stream: stream || undefined,
+      scienceTrack: scienceTrack || undefined,
       branch: branch || undefined,
       subject: subject!,
       difficulty: diff,
     });
   };
 
-  const subjects = getSubjects({ educationLevel: educationLevel || undefined, classOrYear: classOrYear || undefined, stream: stream || undefined, branch: branch || undefined });
+  const subjects = getSubjects({
+    educationLevel: educationLevel || undefined,
+    classOrYear: classOrYear || undefined,
+    stream: stream || undefined,
+    scienceTrack: scienceTrack || undefined,
+    branch: branch || undefined,
+  });
   const showCompetitivePrepHint =
     educationLevel === "higher_secondary" &&
     stream === "science" &&
+    !!scienceTrack &&
     ["Physics", "Chemistry", "Mathematics", "Biology"].includes(subject || "");
 
   return (
@@ -201,6 +230,40 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
           </div>
         )}
 
+        {/* Step 25: Science Track (Medical vs Engineering) */}
+        {step === 25 && (
+          <div className="space-y-4">
+            <div className="text-center space-y-2">
+              <h2 className="text-xl font-bold">Choose Your Goal</h2>
+              <p className="text-sm text-muted-foreground">
+                Pick the track you're preparing for — subjects and difficulty levels are tailored accordingly.
+              </p>
+            </div>
+            <div className="grid gap-4">
+              {scienceTracks.map((track) => {
+                const Icon = track.value === "medical" ? Stethoscope : Cog;
+                return (
+                  <Card
+                    key={track.value}
+                    className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
+                    onClick={() => handleScienceTrack(track.value)}
+                  >
+                    <CardContent className="flex items-center gap-4 p-5">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                        <Icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold">{track.label}</p>
+                        <p className="text-sm text-muted-foreground">{track.description}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Step 3: Subject */}
         {step === 3 && (
           <div className="space-y-4">
@@ -230,7 +293,9 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
               <h2 className="text-xl font-bold">Select Difficulty</h2>
               {showCompetitivePrepHint && (
                 <p className="text-sm text-muted-foreground">
-                  Hard level adds JEE/NEET-style preparation where relevant.
+                  {scienceTrack === "medical"
+                    ? "Levels are tuned for NEET-UG preparation (Physics, Chemistry, Biology)."
+                    : "Levels are tuned for JEE Mains, KEAM, and JEE Advanced preparation."}
                 </p>
               )}
             </div>
@@ -242,6 +307,7 @@ export default function QuizSetup({ onStart }: QuizSetupProps) {
                     educationLevel: educationLevel || undefined,
                     classOrYear: classOrYear || undefined,
                     stream: stream || undefined,
+                    scienceTrack: scienceTrack || undefined,
                     branch: branch || undefined,
                     subject: subject || undefined,
                   },

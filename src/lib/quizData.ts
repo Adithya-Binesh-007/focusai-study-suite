@@ -1,15 +1,22 @@
 export type EducationLevel = "school" | "higher_secondary" | "college";
 export type Difficulty = "easy" | "medium" | "hard";
 export type Stream = "science" | "commerce" | "humanities";
+export type ScienceTrack = "medical" | "engineering";
 
 export interface QuizConfig {
   educationLevel: EducationLevel;
   classOrYear: string;
   stream?: Stream;
+  scienceTrack?: ScienceTrack;
   branch?: string;
   subject: string;
   difficulty: Difficulty;
 }
+
+export const scienceTracks: { value: ScienceTrack; label: string; description: string }[] = [
+  { value: "medical", label: "Medical (NEET)", description: "Physics, Chemistry, Biology — for MBBS/BDS via NEET-UG" },
+  { value: "engineering", label: "Engineering (JEE / KEAM)", description: "Physics, Chemistry, Mathematics — for IIT/NIT via JEE & Kerala via KEAM" },
+];
 
 export const educationLevels: { value: EducationLevel; label: string; description: string }[] = [
   { value: "school", label: "School (Class 1–10)", description: "Standard school curriculum" },
@@ -101,26 +108,30 @@ export const getDifficultyPresentation = (config: Partial<QuizConfig>, difficult
 
   if (isProgrammingSubject(config.subject) && ["higher_secondary", "college"].includes(config.educationLevel || "")) {
     if (difficulty === "easy") {
-      return {
-        ...fallback,
-        label: "Basics",
-        description: "Syntax, core concepts, and simple program logic",
-      };
+      return { ...fallback, label: "Basics", description: "Syntax, core concepts, and simple program logic" };
     }
-
     if (difficulty === "medium") {
-      return {
-        ...fallback,
-        label: "Intermediate",
-        description: "Tracing, functions, debugging, and moderate applications",
-      };
+      return { ...fallback, label: "Intermediate", description: "Tracing, functions, debugging, and moderate applications" };
     }
+    return { ...fallback, label: "Hard", description: "Tough application-level logic and exam-style programming questions" };
+  }
 
-    return {
-      ...fallback,
-      label: "Hard",
-      description: "Tough application-level logic and exam-style programming questions",
-    };
+  // Higher secondary science with track
+  if (
+    config.educationLevel === "higher_secondary" &&
+    config.stream === "science" &&
+    config.scienceTrack &&
+    competitiveScienceSubjects.has(config.subject || "")
+  ) {
+    if (config.scienceTrack === "medical") {
+      if (difficulty === "easy") return { ...fallback, label: "Class Test", description: "Basic recall and conceptual NCERT questions" };
+      if (difficulty === "medium") return { ...fallback, label: "Board Level", description: "Board exam pattern questions (Class 11/12)" };
+      return { ...fallback, label: "NEET-UG Level", description: "NEET-UG style conceptual & application questions" };
+    }
+    // engineering
+    if (difficulty === "easy") return { ...fallback, label: "Board Level", description: "Board exam pattern questions (Class 11/12)" };
+    if (difficulty === "medium") return { ...fallback, label: "JEE Mains / KEAM", description: "JEE Mains & KEAM style problems" };
+    return { ...fallback, label: "JEE Advanced", description: "JEE Advanced level tough analytical problems" };
   }
 
   return fallback;
@@ -165,8 +176,18 @@ const btechSubjects: Record<string, Record<string, string[]>> = {
   },
 };
 
+const medicalSubjects = ["Physics", "Chemistry", "Biology", "English"];
+const engineeringSubjects = [
+  "Physics",
+  "Chemistry",
+  "Mathematics",
+  "Computer Science (Python)",
+  "Computer Science (C++)",
+  "English",
+];
+
 export const getSubjects = (config: Partial<QuizConfig>): string[] => {
-  const { educationLevel, classOrYear, stream, branch } = config;
+  const { educationLevel, classOrYear, stream, scienceTrack, branch } = config;
 
   if (educationLevel === "school") {
     const cls = parseInt(classOrYear || "1");
@@ -176,7 +197,11 @@ export const getSubjects = (config: Partial<QuizConfig>): string[] => {
   }
 
   if (educationLevel === "higher_secondary") {
-    if (stream === "science") return scienceSubjects11_12;
+    if (stream === "science") {
+      if (scienceTrack === "medical") return medicalSubjects;
+      if (scienceTrack === "engineering") return engineeringSubjects;
+      return scienceSubjects11_12;
+    }
     if (stream === "commerce") return commerceSubjects11_12;
     if (stream === "humanities") return humanitiesSubjects11_12;
     return [];
@@ -190,7 +215,7 @@ export const getSubjects = (config: Partial<QuizConfig>): string[] => {
 };
 
 export const getDifficultyContext = (config: QuizConfig): string => {
-  const { educationLevel, difficulty, classOrYear, subject, stream } = config;
+  const { educationLevel, difficulty, classOrYear, subject, stream, scienceTrack } = config;
 
   if (isProgrammingSubject(subject) && ["higher_secondary", "college"].includes(educationLevel)) {
     const programmingScope = subject === "Computer Science (C++)"
@@ -208,24 +233,29 @@ export const getDifficultyContext = (config: QuizConfig): string => {
     const cls = parseInt(classOrYear || "1");
     if (difficulty === "easy") return "simple class test with basic recall questions";
     if (difficulty === "medium") return "mid-term exam (40-60 marks) with application-based questions";
-    // Hard: only class 10 gets "board exam level", rest get "difficult level"
     if (cls === 10) return "board exam level with analytical and higher-order thinking questions";
     return "difficult level with analytical and higher-order thinking questions";
   }
 
   if (educationLevel === "higher_secondary") {
+    // Science with explicit track — focused exam-pattern questions
+    if (stream === "science" && scienceTrack && competitiveScienceSubjects.has(subject)) {
+      if (scienceTrack === "medical") {
+        if (difficulty === "easy") return "simple class test with basic NCERT recall and conceptual questions";
+        if (difficulty === "medium") return "Class 11/12 board exam pattern questions following NCERT syllabus";
+        return "NEET-UG (undergraduate) level questions: conceptual, application-based, and numerical problems strictly aligned with NEET-UG pattern (Physics, Chemistry, Biology). Do NOT include postgraduate content.";
+      }
+      // engineering
+      if (difficulty === "easy") return "Class 11/12 board exam pattern questions following NCERT syllabus";
+      if (difficulty === "medium") return "JEE Mains and Kerala KEAM level questions: objective, application-based problems aligned with JEE Mains and KEAM patterns";
+      return "JEE Advanced level tough questions: multi-concept, analytical, and application-heavy problems strictly aligned with JEE Advanced pattern (only attempt after qualifying Mains)";
+    }
+
     const cls = parseInt(classOrYear || "11");
     if (difficulty === "easy") return "simple class test with basic conceptual questions";
     if (difficulty === "medium") return "mid-term/series exam (40-60 marks) with moderate difficulty";
-    // Hard: class 11 = model/entrance, class 12 = board exam
-    if (cls === 11) {
-      return stream === "science" && competitiveScienceSubjects.has(subject)
-        ? "model exam and entrance exam level questions for competitive preparation, including JEE/NEET-oriented conceptual and application questions where relevant"
-        : "model exam and entrance exam level questions for competitive preparation";
-    }
-    return stream === "science" && competitiveScienceSubjects.has(subject)
-      ? "board exam level questions including previous year board exam patterns, with JEE/NEET-oriented conceptual and application questions where relevant"
-      : "board exam level questions including previous year board exam patterns";
+    if (cls === 11) return "model exam and entrance exam level questions for competitive preparation";
+    return "board exam level questions including previous year board exam patterns";
   }
 
   // college
