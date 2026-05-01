@@ -6,17 +6,19 @@ import {
   EducationLevel,
   Difficulty,
   Stream,
+  ScienceTrack,
   educationLevels,
   schoolClasses,
   higherSecondaryClasses,
   collegeYears,
   streams,
+  scienceTracks,
   btechBranches,
   difficultyLevels,
   getDifficultyPresentation,
   getSubjects,
 } from "@/lib/quizData";
-import { GraduationCap, BookOpen, Building2, ArrowLeft, Clock, HelpCircle, Zap, Flame, Target } from "lucide-react";
+import { GraduationCap, BookOpen, Building2, ArrowLeft, Clock, HelpCircle, Zap, Flame, Target, Stethoscope, Cog } from "lucide-react";
 
 interface QuizSetupProps {
   onStart: (config: QuizConfig) => void;
