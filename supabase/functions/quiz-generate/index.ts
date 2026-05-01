@@ -238,7 +238,12 @@ serve(async (req) => {
 
     let levelLabel = "";
     if (educationLevel === "school") levelLabel = `Class ${classOrYear}`;
-    else if (educationLevel === "higher_secondary") levelLabel = `Class ${classOrYear} (${stream} stream)`;
+    else if (educationLevel === "higher_secondary") {
+      const trackSuffix = stream === "science" && scienceTrack
+        ? scienceTrack === "medical" ? " — Medical/NEET track" : " — Engineering/JEE+KEAM track"
+        : "";
+      levelLabel = `Class ${classOrYear} (${stream} stream${trackSuffix})`;
+    }
     else levelLabel = `B.Tech ${branch?.toUpperCase() || ""} Year ${classOrYear}`;
 
     // For large question counts, split into batches to avoid truncation
