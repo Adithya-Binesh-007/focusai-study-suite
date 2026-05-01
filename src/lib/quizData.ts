@@ -108,26 +108,30 @@ export const getDifficultyPresentation = (config: Partial<QuizConfig>, difficult
 
   if (isProgrammingSubject(config.subject) && ["higher_secondary", "college"].includes(config.educationLevel || "")) {
     if (difficulty === "easy") {
-      return {
-        ...fallback,
-        label: "Basics",
-        description: "Syntax, core concepts, and simple program logic",
-      };
+      return { ...fallback, label: "Basics", description: "Syntax, core concepts, and simple program logic" };
     }
-
     if (difficulty === "medium") {
-      return {
-        ...fallback,
-        label: "Intermediate",
-        description: "Tracing, functions, debugging, and moderate applications",
-      };
+      return { ...fallback, label: "Intermediate", description: "Tracing, functions, debugging, and moderate applications" };
     }
+    return { ...fallback, label: "Hard", description: "Tough application-level logic and exam-style programming questions" };
+  }
 
-    return {
-      ...fallback,
-      label: "Hard",
-      description: "Tough application-level logic and exam-style programming questions",
-    };
+  // Higher secondary science with track
+  if (
+    config.educationLevel === "higher_secondary" &&
+    config.stream === "science" &&
+    config.scienceTrack &&
+    competitiveScienceSubjects.has(config.subject || "")
+  ) {
+    if (config.scienceTrack === "medical") {
+      if (difficulty === "easy") return { ...fallback, label: "Class Test", description: "Basic recall and conceptual NCERT questions" };
+      if (difficulty === "medium") return { ...fallback, label: "Board Level", description: "Board exam pattern questions (Class 11/12)" };
+      return { ...fallback, label: "NEET-UG Level", description: "NEET-UG style conceptual & application questions" };
+    }
+    // engineering
+    if (difficulty === "easy") return { ...fallback, label: "Board Level", description: "Board exam pattern questions (Class 11/12)" };
+    if (difficulty === "medium") return { ...fallback, label: "JEE Mains / KEAM", description: "JEE Mains & KEAM style problems" };
+    return { ...fallback, label: "JEE Advanced", description: "JEE Advanced level tough analytical problems" };
   }
 
   return fallback;
